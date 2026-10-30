@@ -7,7 +7,7 @@
 <style>
   :root{
     --bg:#312e2b; --panel:#272522; --panel2:#211f1c; --text:#e8e6e3; --dim:#989795;
-    --light:#ebecd0; --dark:#739552; --accent:#81b64c; --live:#e02828;
+    --light:#ffffff; --dark:#000000; --accent:#81b64c; --live:#e02828;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,"Segoe UI",sans-serif;padding:16px}
@@ -22,16 +22,18 @@
   .player .rating{color:var(--dim);margin-left:6px;font-weight:400}
   .clock{font-variant-numeric:tabular-nums;font-weight:700;font-size:17px;background:var(--panel2);padding:2px 10px;border-radius:6px}
   .clock.active{background:#fff;color:#111}
-  #board{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:min(480px,92vw);aspect-ratio:1;border-radius:6px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,.4)}
+  #board{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:min(480px,92vw);aspect-ratio:1;border-radius:6px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,.4);border:1px solid #555}
   .sq{position:relative;display:flex;align-items:center;justify-content:center;font-size:clamp(26px,5.2vw,40px);line-height:1;user-select:none;overflow:hidden}
   .sq.l{background:var(--light)} .sq.d{background:var(--dark)}
-  .sq .wp{color:#fff;-webkit-text-stroke:1.2px #2f2f2f;text-shadow:0 2px 3px rgba(0,0,0,.5)}
-  .sq .bp{color:#121007;-webkit-text-stroke:1.2px #cfcfcf;text-shadow:0 0 4px rgba(255,255,255,.35)}
+  .sq img{width:88%;height:88%;pointer-events:none;user-select:none}
+  .sq img.wp{filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
+  .sq img.bp{filter:drop-shadow(0 0 2px rgba(255,255,255,.8))}
   .sq.hlf{box-shadow:inset 0 0 0 4px rgba(255,210,60,.9)}
   .sq.hlt{box-shadow:inset 0 0 0 4px rgba(140,225,95,.95)}
   .sq{cursor:pointer}
   .sq.sel{box-shadow:inset 0 0 0 4px rgba(90,170,255,.95)}
   .sq.dot::before{content:"";position:absolute;width:30%;height:30%;border-radius:50%;background:rgba(20,18,15,.35);z-index:1}
+  .sq.d.dot::before{background:rgba(255,255,255,.4)}
   #exploreBar{display:flex;gap:10px;align-items:center;margin-top:8px;width:min(480px,92vw);background:#3a3320;border:1px solid #f7c631;border-radius:8px;padding:8px 12px;font-size:13px}
   #exploreBar button{background:#f7c631;color:#14120f;border:0;border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer}
   #exploreMoves{flex:1;color:#f7c631;font-weight:600}
@@ -114,7 +116,6 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 <script>
-const PIECES={K:"♔",Q:"♕",R:"♖",B:"♗",N:"♘",P:"♙",k:"♚",q:"♛",r:"♜",b:"♝",n:"♞",p:"♟"};
 const boardEl=document.getElementById('board');
 const $=id=>document.getElementById(id);
 let liveMode=false;
@@ -183,7 +184,14 @@ function renderFen(fen,flip,hl){
     sq.className=cls;
     sq.dataset.sq=name;
     const p=grid[ri][fi];
-    if(p){const s=document.createElement('span');s.className=(p===p.toUpperCase())?'wp':'bp';s.textContent=PIECES[p];sq.appendChild(s);}
+    if(p){
+      const isW=p===p.toUpperCase();
+      const s=document.createElement('img');
+      s.className=isW?'wp':'bp';
+      s.src=`/static/pieces/${isW?'w':'b'}${p.toUpperCase()}.svg`;
+      s.alt=p; s.draggable=false;
+      sq.appendChild(s);
+    }
     boardEl.appendChild(sq);
   }
 }
@@ -393,7 +401,9 @@ async function tick(){
     if(st.live){
       liveMode=true; stopPlay(); $('replayControls').hidden=true;
       $('mode').textContent='EN VIVO'; $('mode').className='badge live';
-      const flip=st.live.playingAs===2;
+      // 2 = juegas con negras → tablero volteado; si no llegó el dato, usa el color de tu última partida
+      const pa=Number(st.live.playingAs);
+      const flip=pa===2||(pa!==1&&!!(game&&game.userIsBlack));
       renderFen(st.live.fen,flip);
       const c=st.live.clocks||[];
       $('topClock').textContent=c[0]||'--:--';
@@ -417,13 +427,18 @@ const bmSrc=`(function(){
   if(window.__zackwatch){alert('ZackWatch ya esta activo en esta pestana');return;}
   var b=document.querySelector('wc-chess-board');
   if(!b||!b.game){alert('No encontre el tablero de chess.com aqui. Abre esta pagina con tu partida.');return;}
-  var pa=null;try{pa=b.game.getPlayingAs();}catch(e){}
+  function pa(){
+    try{var p=b.game.getPlayingAs();if(p===1||p===2)return p;}catch(e){}
+    try{var o=b.game.getOptions&&b.game.getOptions();if(o&&o.flipped!=null)return o.flipped?2:1;}catch(e){}
+    try{if(b.classList.contains('flipped')||b.hasAttribute('flipped'))return 2;}catch(e){}
+    return null;
+  }
   function clocks(){var els=document.querySelectorAll('.clock-component');
     return Array.prototype.slice.call(els,0,2).map(function(e){return e.textContent.replace(/[^0-9:.]/g,'');});}
   function send(){try{
     fetch('http://localhost:8787/api/push',{method:'POST',mode:'no-cors',
       headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({fen:b.game.getFEN(),clocks:clocks(),playingAs:pa})});
+      body:JSON.stringify({fen:b.game.getFEN(),clocks:clocks(),playingAs:pa()})});
   }catch(e){}}
   window.__zackwatch=setInterval(send,1000);send();
   console.log('[ZackWatch] transmitiendo a localhost:8787');

@@ -157,11 +157,15 @@ def api_push():
             payload = request.get_json(force=True, silent=True) or {}
             fen = str(payload.get("fen", ""))
             chess.Board(fen)  # valida el FEN; lanza si es basura
+            try:
+                playing_as = int(payload.get("playingAs") or 0)
+            except (TypeError, ValueError):
+                playing_as = 0
             with lock:
                 state["live"] = {
                     "fen": fen,
                     "clocks": [str(c)[:12] for c in payload.get("clocks", [])[:2]],
-                    "playingAs": payload.get("playingAs"),
+                    "playingAs": playing_as if playing_as in (1, 2) else None,
                     "received": time.time(),
                 }
             resp = jsonify({"ok": True})
