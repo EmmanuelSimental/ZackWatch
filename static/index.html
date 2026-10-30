@@ -22,7 +22,7 @@
   .player .rating{color:var(--dim);margin-left:6px;font-weight:400}
   .clock{font-variant-numeric:tabular-nums;font-weight:700;font-size:17px;background:var(--panel2);padding:2px 10px;border-radius:6px}
   .clock.active{background:#fff;color:#111}
-  #board{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:min(480px,92vw);aspect-ratio:1;border-radius:6px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,.4);border:1px solid #555}
+  #board,#board2{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:min(480px,92vw);aspect-ratio:1;border-radius:6px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,.4);border:1px solid #555}
   .sq{position:relative;display:flex;align-items:center;justify-content:center;font-size:clamp(26px,5.2vw,40px);line-height:1;user-select:none;overflow:hidden}
   .sq.l{background:var(--light)} .sq.d{background:var(--dark)}
   .sq img{width:88%;height:88%;pointer-events:none;user-select:none}
@@ -59,6 +59,23 @@
   .controls input[type=range]{flex:1;accent-color:var(--accent)}
   #result{font-weight:700;color:var(--accent)}
   .bm{display:inline-block;background:var(--accent);color:#14120f;font-weight:700;padding:8px 14px;border-radius:8px;text-decoration:none;cursor:grab}
+  #btnImport{display:block;margin-top:10px;width:min(480px,92vw);background:#4a7fb5;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;cursor:pointer}
+  #btnImport:hover{background:#5a8fc5}
+  #analysis{margin-top:26px;padding-top:18px;border-top:2px dashed #555}
+  #analysis h1{font-size:18px}
+  #sug2 .line{display:flex;gap:8px;align-items:baseline;padding:6px 8px;border-radius:6px;cursor:pointer;margin-bottom:4px;background:var(--panel2)}
+  #sug2 .line:hover{background:#3a3733}
+  #sug2 .line .ev{font-weight:700;min-width:52px;color:var(--accent)}
+  #sug2 .line .pv{color:var(--text);font-size:13px}
+  #sug2 .line:first-child .ev{color:#f7c631}
+  #a2Hist{font-size:13px;color:var(--dim);margin-top:6px;word-break:break-word}
+  #a2Hist b{color:var(--text)}
+  #b2wrap{display:flex;gap:8px;align-items:stretch}
+  #board2{width:min(454px,calc(92vw - 26px))}
+  #evalBar{width:18px;border-radius:4px;overflow:hidden;background:#2b2926;position:relative;border:1px solid #555;flex:none}
+  #evalFill{position:absolute;bottom:0;left:0;width:100%;height:50%;background:#eee;transition:height .5s}
+  #evalBar.flip #evalFill{bottom:auto;top:0}
+  #evalBarTxt{position:absolute;bottom:3px;left:0;width:100%;text-align:center;font-size:9px;font-weight:700;mix-blend-mode:difference;color:#fff;z-index:1}
   ol{margin:8px 0 0;padding-left:20px;color:var(--dim)} ol b{color:var(--text)}
   #status{font-size:12px;color:var(--dim);margin-top:12px}
 </style>
@@ -88,6 +105,11 @@
         <span>🧪 Explorando:</span><span id="exploreMoves"></span>
         <button id="exploreBack">↩ Volver a la partida</button>
       </div>
+      <button id="btnImport" hidden>⤵ Importar posición al tablero de análisis</button>
+      <label id="autoImportLbl" hidden style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;color:var(--dim);width:min(480px,92vw)">
+        <input type="checkbox" id="autoImport">
+        Importar movimientos automáticamente al tablero de análisis
+      </label>
     </div>
 
     <div class="side">
@@ -110,6 +132,37 @@
         </ol>
       </div>
       <div id="status"></div>
+    </div>
+  </div>
+
+  <div id="analysis" hidden>
+    <h1>🔬 Tablero de análisis</h1>
+    <div class="sub">Posición importada — mueve piezas libremente o toca una sugerencia para jugarla</div>
+    <div class="layout">
+      <div class="boardcol">
+        <div id="b2wrap">
+          <div id="evalBar"><div id="evalFill"></div><span id="evalBarTxt"></span></div>
+          <div id="board2"></div>
+        </div>
+        <div class="controls">
+          <button id="a2Reset" title="Volver a la posición importada">⏮ Importada</button>
+          <button id="a2Undo" title="Deshacer jugada">↩ Deshacer</button>
+          <button id="a2Best" title="Jugar la mejor sugerencia">★ Jugar la mejor</button>
+          <button id="a2Flip" title="Girar tablero">🔄</button>
+        </div>
+      </div>
+      <div class="side">
+        <div class="card">
+          <h2>Sugerencias de continuación</h2>
+          <div id="eval2" style="font-weight:700;font-size:18px">—</div>
+          <div id="sug2" style="margin-top:8px">esperando posición…</div>
+          <div style="color:var(--dim);font-size:12px;margin-top:6px">Clic en una línea para jugar su primera jugada en el tablero.</div>
+        </div>
+        <div class="card">
+          <h2>Jugadas en este tablero</h2>
+          <div id="a2Hist">—</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -159,6 +212,9 @@ function computeSafety(grid){
 let fenShown='', flipShown=false;
 function renderFen(fen,flip,hl){
   fenShown=fen; flipShown=flip;
+  drawBoard(boardEl,fen,flip,hl);
+}
+function drawBoard(el,fen,flip,hl){
   const rows=fen.split(' ')[0].split('/');
   const grid=[];
   for(const row of rows){
@@ -169,7 +225,7 @@ function renderFen(fen,flip,hl){
     }
     grid.push(r);
   }
-  boardEl.innerHTML='';
+  el.innerHTML='';
   const marks=$('safetyToggle').checked?computeSafety(grid):{};
   const ranks=[...Array(8).keys()];       // 0..7 = fila 8..1 del FEN
   const files=[...Array(8).keys()];
@@ -192,7 +248,7 @@ function renderFen(fen,flip,hl){
       s.alt=p; s.draggable=false;
       sq.appendChild(s);
     }
-    boardEl.appendChild(sq);
+    el.appendChild(sq);
   }
 }
 renderFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",false);
@@ -200,11 +256,12 @@ renderFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",false);
 function fmtTenths(t){const s=Math.max(0,Math.floor(t/10));return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;}
 
 // ---- motor Stockfish (solo replay) ----
-let engine=null, engineReady=false, lastInfo=null;
+let engine=null, engineReady=false, lastInfo=null, lastInfos=[];
 let jobQueue=[], currentJob=null;
 function pump(){
   if(!engineReady||currentJob||jobQueue.length===0)return;
-  currentJob=jobQueue.shift(); lastInfo=null;
+  currentJob=jobQueue.shift(); lastInfo=null; lastInfos=[];
+  engine.postMessage('setoption name MultiPV value '+(currentJob.multipv||1));
   engine.postMessage('position fen '+currentJob.fen);
   engine.postMessage('go depth '+currentJob.depth);
 }
@@ -227,11 +284,15 @@ function onEngine(line){
   if(line==='uciok'){engineReady=true;$('bestmove').textContent='motor listo';pump();return;}
   if(line.startsWith('info')&&line.includes(' pv ')){
     const cp=line.match(/score cp (-?\d+)/), mate=line.match(/score mate (-?\d+)/);
-    lastInfo={cp:cp?+cp[1]:null, mate:mate?+mate[1]:null};
+    const mp=line.match(/multipv (\d+)/), pv=line.match(/ pv (.+)$/);
+    const info={cp:cp?+cp[1]:null, mate:mate?+mate[1]:null, pv:pv?pv[1].trim().split(/\s+/):[]};
+    const idx=mp?+mp[1]-1:0;
+    lastInfos[idx]=info;
+    if(idx===0)lastInfo=info;
   }
   if(line.startsWith('bestmove')){
     const job=currentJob; currentJob=null;
-    if(job)job.cb(lastInfo,line.split(' ')[1]);
+    if(job)job.cb(lastInfo,line.split(' ')[1],lastInfos);
     pump();
   }
 }
@@ -305,6 +366,7 @@ function setPly(p){
   ply=Math.max(0,Math.min(p,game.fens.length-1));
   renderFen(game.fens[ply],game.userIsBlack);
   analyze(game.fens[ply]);
+  maybeAutoImport();
   $('slider').value=ply;
   // relojes en este ply
   let w=null,b=null;
@@ -335,6 +397,7 @@ function loadGame(g){
   }
   mv.onclick=e=>{const el=e.target.closest('.mv');if(el&&el.dataset.p){stopPlay();setPly(+el.dataset.p);}};
   $('replayControls').hidden=false;
+  $('btnImport').hidden=false; $('autoImportLbl').hidden=false;
   $('blunders').textContent='';
   jobQueue=jobQueue.filter(j=>j.kind!=='batch');
   setPly(g.fens.length-1);
@@ -379,6 +442,7 @@ boardEl.addEventListener('click',e=>{
       $('exploreBar').hidden=false;
       $('exploreMoves').textContent=explore.sans.join(' ');
       analyze(c.fen());
+      maybeAutoImport();
       return;
     }
   }
@@ -392,8 +456,163 @@ boardEl.addEventListener('click',e=>{
 });
 $('exploreBack').onclick=()=>{explore=null;selSq=null;$('exploreBar').hidden=true;setPly(ply);};
 
+// ---- tablero de análisis: importa la posición actual y sugiere continuaciones ----
+const board2El=document.getElementById('board2');
+let a2=null, selSq2=null;   // a2 = {chess, startFen, flip, sans:[]}
+
+function importFen(fen,flip){
+  a2={chess:new Chess(fen), startFen:fen, flip:flip, sans:[]};
+  selSq2=null;
+  $('analysis').hidden=false;
+  renderBoard2();
+  analyze2();
+}
+$('btnImport').onclick=()=>{
+  if(typeof Chess==='undefined'){alert('chess.js no cargó (se necesita internet).');return;}
+  const fen=liveMode?lastLiveFen:baseFen();
+  if(!fen){alert('No hay posición que importar todavía.');return;}
+  importFen(fen,flipShown);
+  $('analysis').scrollIntoView({behavior:'smooth'});
+};
+function maybeAutoImport(){
+  if(!$('autoImport').checked||typeof Chess==='undefined')return;
+  const fen=liveMode?lastLiveFen:baseFen();
+  if(!fen)return;
+  if(a2&&a2.startFen===fen)return;   // misma posición: no pisar lo que el usuario mueva en el tablero 2
+  importFen(fen,flipShown);
+}
+$('autoImport').onchange=()=>maybeAutoImport();
+
+function renderBoard2(hl){
+  if(!a2)return;
+  drawBoard(board2El,a2.chess.fen(),a2.flip,hl);
+  const h=a2.chess.history(), parts=[];
+  const black1st=a2.startFen.split(' ')[1]==='b';
+  for(let i=0;i<h.length;i++){
+    const n=Math.floor((i+(black1st?1:0))/2)+1;
+    if(i===0&&black1st)parts.push(`${n}… <b>${h[i]}</b>`);
+    else if((i+(black1st?1:0))%2===0)parts.push(`${n}. <b>${h[i]}</b>`);
+    else parts.push(`<b>${h[i]}</b>`);
+  }
+  $('a2Hist').innerHTML=parts.length?parts.join(' '):'— (posición importada, sin jugadas aún)';
+}
+
+function pvToSan(fen,pvUci,maxMoves){
+  const c=new Chess(fen), out=[];
+  const black1st=fen.split(' ')[1]==='b';
+  for(let i=0;i<Math.min(pvUci.length,maxMoves);i++){
+    const u=pvUci[i];
+    const mv=c.move({from:u.slice(0,2),to:u.slice(2,4),promotion:u[4]||'q'});
+    if(!mv)break;
+    const n=Math.floor((i+(black1st?1:0))/2)+1;
+    if(i===0&&black1st)out.push(`${n}… ${mv.san}`);
+    else if((i+(black1st?1:0))%2===0)out.push(`${n}. ${mv.san}`);
+    else out.push(mv.san);
+  }
+  return out.join(' ');
+}
+
+function setEvalBar(whitePct,txt){
+  $('evalBar').classList.toggle('flip',!!(a2&&a2.flip));
+  $('evalFill').style.height=Math.max(0,Math.min(100,whitePct))+'%';
+  $('evalBarTxt').textContent=txt;
+}
+function evalBarFromInfo(info,fen){
+  if(!info){setEvalBar(50,'');return;}
+  if(info.mate!=null){
+    const m=fen.split(' ')[1]==='b'?-info.mate:info.mate;
+    setEvalBar(m>0?100:0,'M'+Math.abs(m));
+    return;
+  }
+  const v=toWhiteEval(info,fen);
+  // curva suave: ±1 peón ≈ 60/40, ±4 peones ≈ 83/17, se satura hacia 100/0
+  setEvalBar(50+50*(2/(1+Math.exp(-0.004*v))-1),Math.abs(v/100).toFixed(1));
+}
+function fmtEval(info,fen){
+  if(!info)return '…';
+  if(info.mate!=null){const m=fen.split(' ')[1]==='b'?-info.mate:info.mate;return(m>0?'+M':'-M')+Math.abs(m);}
+  const v=toWhiteEval(info,fen);
+  return(v>0?'+':'')+(v/100).toFixed(2);
+}
+
+function analyze2(){
+  if(!a2)return;
+  const fen=a2.chess.fen();
+  if(a2.chess.game_over()){
+    if(a2.chess.in_checkmate()){
+      $('eval2').textContent='Jaque mate';
+      setEvalBar(a2.chess.turn()==='w'?0:100,'#');
+    }else{
+      $('eval2').textContent='Tablas';
+      setEvalBar(50,'½');
+    }
+    $('sug2').textContent='La partida terminó en esta posición.';
+    return;
+  }
+  if(liveMode){
+    $('eval2').textContent='—';
+    setEvalBar(50,'');
+    $('sug2').textContent='Sugerencias desactivadas mientras hay partida en vivo (fair play). Al terminar tu partida se activan solas.';
+    return;
+  }
+  if(!engineReady){$('sug2').textContent='cargando motor…';setTimeout(()=>{if(a2&&a2.chess.fen()===fen)analyze2();},800);return;}
+  jobQueue=jobQueue.filter(j=>j.kind!=='ui2');
+  $('eval2').textContent='…'; $('sug2').textContent='analizando…';
+  enqueue({kind:'ui2',fen,depth:14,multipv:3,cb:(info,mv,infos)=>{
+    if(!a2||a2.chess.fen()!==fen||!infos.length)return;
+    $('eval2').textContent=fmtEval(infos[0],fen)+(fen.split(' ')[1]==='w'?' — juegan blancas':' — juegan negras');
+    evalBarFromInfo(infos[0],fen);
+    const box=$('sug2'); box.innerHTML='';
+    infos.forEach(inf=>{
+      if(!inf||!inf.pv.length)return;
+      const div=document.createElement('div');
+      div.className='line';
+      div.innerHTML=`<span class="ev">${fmtEval(inf,fen)}</span><span class="pv">${pvToSan(fen,inf.pv,8)}</span>`;
+      div.onclick=()=>playUci2(inf.pv[0]);
+      box.appendChild(div);
+    });
+    const best=infos[0]&&infos[0].pv[0];
+    if(best)renderBoard2([best.slice(0,2),best.slice(2,4)]);
+  }},true);
+  if(currentJob)engine.postMessage('stop');
+}
+
+function playUci2(u){
+  if(!a2||!u)return;
+  const mv=a2.chess.move({from:u.slice(0,2),to:u.slice(2,4),promotion:u[4]||'q'});
+  if(mv){selSq2=null;renderBoard2();analyze2();}
+}
+
+board2El.addEventListener('click',e=>{
+  if(!a2)return;
+  const sqEl=e.target.closest('.sq'); if(!sqEl)return;
+  const sqName=sqEl.dataset.sq;
+  if(selSq2&&selSq2!==sqName){
+    const mv=a2.chess.move({from:selSq2,to:sqName,promotion:'q'});
+    if(mv){selSq2=null;renderBoard2();analyze2();return;}
+  }
+  const piece=a2.chess.get(sqName);
+  if(piece&&piece.color===a2.chess.turn()){
+    selSq2=sqName;
+    renderBoard2();
+    const q=n=>board2El.querySelector(`[data-sq="${n}"]`);
+    const s=q(sqName); if(s)s.classList.add('sel');
+    a2.chess.moves({square:sqName,verbose:true}).forEach(m=>{const el=q(m.to);if(el)el.classList.add('dot');});
+  }else{
+    selSq2=null; renderBoard2();
+  }
+});
+
+$('a2Reset').onclick=()=>{if(a2){a2.chess=new Chess(a2.startFen);selSq2=null;renderBoard2();analyze2();}};
+$('a2Undo').onclick=()=>{if(a2){a2.chess.undo();selSq2=null;renderBoard2();analyze2();}};
+$('a2Flip').onclick=()=>{if(a2){a2.flip=!a2.flip;renderBoard2();$('evalBar').classList.toggle('flip',a2.flip);}};
+$('a2Best').onclick=()=>{
+  const first=$('sug2').querySelector('.line');
+  if(first)first.click();
+};
+
 // ---- loop principal ----
-let lastGameId=null;
+let lastGameId=null, lastLiveFen=null;
 async function tick(){
   try{
     const st=await (await fetch('/api/state')).json();
@@ -404,7 +623,10 @@ async function tick(){
       // 2 = juegas con negras → tablero volteado; si no llegó el dato, usa el color de tu última partida
       const pa=Number(st.live.playingAs);
       const flip=pa===2||(pa!==1&&!!(game&&game.userIsBlack));
+      lastLiveFen=st.live.fen;
       renderFen(st.live.fen,flip);
+      $('btnImport').hidden=false; $('autoImportLbl').hidden=false;
+      maybeAutoImport();
       const c=st.live.clocks||[];
       $('topClock').textContent=c[0]||'--:--';
       $('botClock').textContent=c[1]||'--:--';
@@ -414,7 +636,7 @@ async function tick(){
       $('evalline').textContent='—';
       $('bestmove').textContent='Análisis desactivado durante la partida (fair play). Al terminar, el replay con sugerencias carga solo.';
     }else{
-      if(liveMode){liveMode=false;lastGameId=null;}   // al acabar el live, recarga la última
+      if(liveMode){liveMode=false;lastGameId=null;if(a2)analyze2();}   // al acabar el live, recarga la última y reactiva sugerencias
       $('mode').textContent='ÚLTIMA PARTIDA'; $('mode').className='badge';
       if(st.latest&&st.latest.id!==lastGameId){lastGameId=st.latest.id;loadGame(st.latest);}
     }
