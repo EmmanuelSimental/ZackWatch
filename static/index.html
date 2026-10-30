@@ -1,650 +1,812 @@
-<!doctype html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ZackWatch</title>
+<!doctype html>  <!-- Declara que este documento es HTML5 -->
+<html lang="es">  <!-- Raíz del documento; lang="es" indica que el contenido está en español -->
+<head>  <!-- Cabecera: metadatos, título y estilos (nada visible directamente) -->
+<meta charset="utf-8">  <!-- Codificación de caracteres UTF-8 (acentos, emojis, piezas ♞) -->
+<meta name="viewport" content="width=device-width, initial-scale=1">  <!-- Hace que la página escale bien en móviles -->
+<title>ZackWatch</title>  <!-- Título que aparece en la pestaña del navegador -->
 <style>
+  /* ======================== VARIABLES DE COLOR ======================== */
   :root{
+    /* --bg: fondo general · --panel/--panel2: fondos de tarjetas · --text: texto · --dim: texto atenuado */
     --bg:#312e2b; --panel:#272522; --panel2:#211f1c; --text:#e8e6e3; --dim:#989795;
+    /* --light/--dark: casillas del tablero · --accent: verde de acento · --live: rojo del modo en vivo */
     --light:#ffffff; --dark:#000000; --accent:#81b64c; --live:#e02828;
   }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,"Segoe UI",sans-serif;padding:16px}
-  .wrap{max-width:960px;margin:0 auto}
-  h1{font-size:20px;margin:0 0 2px}
-  .sub{color:var(--dim);font-size:13px;margin-bottom:14px}
-  .layout{display:flex;gap:18px;flex-wrap:wrap}
-  .boardcol{flex:0 0 auto}
-  .side{flex:1 1 260px;min-width:260px;display:flex;flex-direction:column;gap:10px}
-  .player{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--panel);border-radius:8px;margin:6px 0;width:min(480px,92vw)}
-  .player .name{font-weight:600}
-  .player .rating{color:var(--dim);margin-left:6px;font-weight:400}
-  .clock{font-variant-numeric:tabular-nums;font-weight:700;font-size:17px;background:var(--panel2);padding:2px 10px;border-radius:6px}
-  .clock.active{background:#fff;color:#111}
-  #board,#board2{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:min(480px,92vw);aspect-ratio:1;border-radius:6px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,.4);border:1px solid #555}
-  .sq{position:relative;display:flex;align-items:center;justify-content:center;font-size:clamp(26px,5.2vw,40px);line-height:1;user-select:none;overflow:hidden}
-  .sq.l{background:var(--light)} .sq.d{background:var(--dark)}
-  .sq img{width:88%;height:88%;pointer-events:none;user-select:none}
-  .sq img.wp{filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
-  .sq img.bp{filter:drop-shadow(0 0 2px rgba(255,255,255,.8))}
-  .sq.hlf{box-shadow:inset 0 0 0 4px rgba(255,210,60,.9)}
-  .sq.hlt{box-shadow:inset 0 0 0 4px rgba(140,225,95,.95)}
-  .sq{cursor:pointer}
-  .sq.sel{box-shadow:inset 0 0 0 4px rgba(90,170,255,.95)}
-  .sq.dot::before{content:"";position:absolute;width:30%;height:30%;border-radius:50%;background:rgba(20,18,15,.35);z-index:1}
-  .sq.d.dot::before{background:rgba(255,255,255,.4)}
-  #exploreBar{display:flex;gap:10px;align-items:center;margin-top:8px;width:min(480px,92vw);background:#3a3320;border:1px solid #f7c631;border-radius:8px;padding:8px 12px;font-size:13px}
-  #exploreBar button{background:#f7c631;color:#14120f;border:0;border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer}
-  #exploreMoves{flex:1;color:#f7c631;font-weight:600}
-  .sq.danger::after,.sq.warn::after,.sq.safe::after{content:"";position:absolute;top:0;right:0;border-style:solid;border-width:0 15px 15px 0}
-  .sq.danger::after{border-color:transparent #e02828 transparent transparent}
-  .sq.warn::after{border-color:transparent #f7c631 transparent transparent}
-  .sq.safe::after{border-color:transparent #81b64c transparent transparent}
-  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.06em;padding:3px 10px;border-radius:99px;background:var(--panel2);color:var(--dim)}
-  .badge.live{background:var(--live);color:#fff}
-  .badge.live::before{content:"";width:8px;height:8px;border-radius:50%;background:#fff;animation:blink 1s infinite}
-  @keyframes blink{50%{opacity:.25}}
-  .card{background:var(--panel);border-radius:10px;padding:12px 14px}
-  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin:0 0 8px}
-  #moves{max-height:300px;overflow-y:auto;font-variant-numeric:tabular-nums;font-size:14px}
-  #moves .row{display:flex;gap:10px;padding:1px 6px;border-radius:4px}
-  #moves .row:nth-child(odd){background:rgba(255,255,255,.03)}
-  #moves .num{color:var(--dim);width:28px;flex:none}
-  #moves .mv{width:64px;cursor:pointer}
-  #moves .mv.cur{background:var(--accent);color:#14120f;border-radius:4px;padding:0 4px;font-weight:700}
-  .controls{display:flex;gap:8px;align-items:center;margin-top:10px;width:min(480px,92vw)}
-  .controls button{background:var(--panel);color:var(--text);border:0;border-radius:8px;padding:8px 14px;font-size:16px;cursor:pointer}
-  .controls button:hover{background:#3a3733}
-  .controls input[type=range]{flex:1;accent-color:var(--accent)}
-  #result{font-weight:700;color:var(--accent)}
-  .bm{display:inline-block;background:var(--accent);color:#14120f;font-weight:700;padding:8px 14px;border-radius:8px;text-decoration:none;cursor:grab}
-  #btnImport{display:block;margin-top:10px;width:min(480px,92vw);background:#4a7fb5;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;cursor:pointer}
-  #btnImport:hover{background:#5a8fc5}
-  #analysis{margin-top:26px;padding-top:18px;border-top:2px dashed #555}
-  #analysis h1{font-size:18px}
-  #sug2 .line{display:flex;gap:8px;align-items:baseline;padding:6px 8px;border-radius:6px;cursor:pointer;margin-bottom:4px;background:var(--panel2)}
-  #sug2 .line:hover{background:#3a3733}
-  #sug2 .line .ev{font-weight:700;min-width:52px;color:var(--accent)}
-  #sug2 .line .pv{color:var(--text);font-size:13px}
-  #sug2 .line:first-child .ev{color:#f7c631}
-  #a2Hist{font-size:13px;color:var(--dim);margin-top:6px;word-break:break-word}
-  #a2Hist b{color:var(--text)}
-  #b2wrap{display:flex;gap:8px;align-items:stretch}
-  #board2{width:min(454px,calc(92vw - 26px))}
-  #evalBar{width:18px;border-radius:4px;overflow:hidden;background:#2b2926;position:relative;border:1px solid #555;flex:none}
-  #evalFill{position:absolute;bottom:0;left:0;width:100%;height:50%;background:#eee;transition:height .5s}
-  #evalBar.flip #evalFill{bottom:auto;top:0}
-  #evalBarTxt{position:absolute;bottom:3px;left:0;width:100%;text-align:center;font-size:9px;font-weight:700;mix-blend-mode:difference;color:#fff;z-index:1}
-  ol{margin:8px 0 0;padding-left:20px;color:var(--dim)} ol b{color:var(--text)}
-  #status{font-size:12px;color:var(--dim);margin-top:12px}
+  *{box-sizing:border-box}  /* Todos los elementos miden ancho/alto incluyendo padding y borde */
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,"Segoe UI",sans-serif;padding:16px}  /* Fondo oscuro, tipografía del sistema, padding general */
+  .wrap{max-width:960px;margin:0 auto}  /* Contenedor central: máx 960px y centrado horizontal */
+  h1{font-size:20px;margin:0 0 2px}  /* Título principal compacto */
+  .sub{color:var(--dim);font-size:13px;margin-bottom:14px}  /* Subtítulo gris pequeño */
+  .layout{display:flex;gap:18px;flex-wrap:wrap}  /* Fila flexible: tablero a la izquierda, paneles a la derecha; se apila en pantallas chicas */
+  .boardcol{flex:0 0 auto}  /* Columna del tablero: no crece ni se encoge */
+  .side{flex:1 1 260px;min-width:260px;display:flex;flex-direction:column;gap:10px}  /* Columna lateral: ocupa el resto, apila tarjetas */
+  .player{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--panel);border-radius:8px;margin:6px 0;width:min(480px,92vw)}  /* Barra con nombre y reloj de un jugador */
+  .player .name{font-weight:600}  /* Nombre del jugador en negrita */
+  .player .rating{color:var(--dim);margin-left:6px;font-weight:400}  /* Rating en gris junto al nombre */
+  .clock{font-variant-numeric:tabular-nums;font-weight:700;font-size:17px;background:var(--panel2);padding:2px 10px;border-radius:6px}  /* Reloj con dígitos de ancho fijo */
+  .clock.active{background:#fff;color:#111}  /* Reloj del jugador al que le toca mover: fondo blanco */
+  #board,#board2{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:min(480px,92vw);aspect-ratio:1;border-radius:6px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,.4);border:1px solid #555}  /* Ambos tableros: rejilla 8x8 cuadrada con sombra */
+  .sq{position:relative;display:flex;align-items:center;justify-content:center;font-size:clamp(26px,5.2vw,40px);line-height:1;user-select:none;overflow:hidden}  /* Una casilla: centra su pieza, tamaño de fuente adaptable */
+  .sq.l{background:var(--light)} .sq.d{background:var(--dark)}  /* l = casilla clara, d = casilla oscura */
+  .sq img{width:88%;height:88%;pointer-events:none;user-select:none}  /* La imagen SVG de la pieza ocupa 88% de la casilla y no captura clics */
+  .sq img.wp{filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}  /* Pieza blanca: sombra oscura para destacar sobre casillas blancas */
+  .sq img.bp{filter:drop-shadow(0 0 2px rgba(255,255,255,.8))}  /* Pieza negra: halo blanco para destacar sobre casillas negras */
+  .sq.hlf{box-shadow:inset 0 0 0 4px rgba(255,210,60,.9)}  /* hlf = casilla de ORIGEN de la jugada resaltada (marco amarillo) */
+  .sq.hlt{box-shadow:inset 0 0 0 4px rgba(140,225,95,.95)}  /* hlt = casilla de DESTINO de la jugada resaltada (marco verde) */
+  .sq{cursor:pointer}  /* Las casillas muestran cursor de mano (son clicables) */
+  .sq.sel{box-shadow:inset 0 0 0 4px rgba(90,170,255,.95)}  /* sel = casilla seleccionada por el usuario (marco azul) */
+  .sq.dot::before{content:"";position:absolute;width:30%;height:30%;border-radius:50%;background:rgba(20,18,15,.35);z-index:1}  /* dot = punto que marca un destino legal de la pieza seleccionada */
+  .sq.d.dot::before{background:rgba(255,255,255,.4)}  /* El punto se vuelve claro sobre casillas oscuras para que se vea */
+  #exploreBar{display:flex;gap:10px;align-items:center;margin-top:8px;width:min(480px,92vw);background:#3a3320;border:1px solid #f7c631;border-radius:8px;padding:8px 12px;font-size:13px}  /* Barra amarilla que aparece en modo exploración */
+  #exploreBar button{background:#f7c631;color:#14120f;border:0;border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer}  /* Botón "volver a la partida" dentro de esa barra */
+  #exploreMoves{flex:1;color:#f7c631;font-weight:600}  /* Texto con las jugadas exploradas hasta ahora */
+  .sq.danger::after,.sq.warn::after,.sq.safe::after{content:"";position:absolute;top:0;right:0;border-style:solid;border-width:0 15px 15px 0}  /* Triangulito de seguridad en la esquina superior derecha de la casilla */
+  .sq.danger::after{border-color:transparent #e02828 transparent transparent}  /* Rojo: pieza atacada y sin defensa */
+  .sq.warn::after{border-color:transparent #f7c631 transparent transparent}  /* Amarillo: pieza atacada pero defendida */
+  .sq.safe::after{border-color:transparent #81b64c transparent transparent}  /* Verde: pieza defendida y no atacada */
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.06em;padding:3px 10px;border-radius:99px;background:var(--panel2);color:var(--dim)}  /* Pildorita de estado junto al título (EN VIVO / ÚLTIMA PARTIDA) */
+  .badge.live{background:var(--live);color:#fff}  /* Variante roja cuando hay partida en vivo */
+  .badge.live::before{content:"";width:8px;height:8px;border-radius:50%;background:#fff;animation:blink 1s infinite}  /* Puntito blanco parpadeante dentro de la pildorita */
+  @keyframes blink{50%{opacity:.25}}  /* Animación del parpadeo: baja la opacidad a mitad del ciclo */
+  .card{background:var(--panel);border-radius:10px;padding:12px 14px}  /* Tarjeta genérica del panel lateral */
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin:0 0 8px}  /* Título pequeño en mayúsculas de cada tarjeta */
+  #moves{max-height:300px;overflow-y:auto;font-variant-numeric:tabular-nums;font-size:14px}  /* Lista de jugadas con scroll propio */
+  #moves .row{display:flex;gap:10px;padding:1px 6px;border-radius:4px}  /* Una fila = número + jugada blanca + jugada negra */
+  #moves .row:nth-child(odd){background:rgba(255,255,255,.03)}  /* Filas alternas ligeramente más claras (efecto cebra) */
+  #moves .num{color:var(--dim);width:28px;flex:none}  /* Número de jugada en gris con ancho fijo */
+  #moves .mv{width:64px;cursor:pointer}  /* Cada jugada es clicable (salta el replay a ese punto) */
+  #moves .mv.cur{background:var(--accent);color:#14120f;border-radius:4px;padding:0 4px;font-weight:700}  /* La jugada actualmente mostrada se resalta en verde */
+  .controls{display:flex;gap:8px;align-items:center;margin-top:10px;width:min(480px,92vw)}  /* Fila de botones de replay bajo el tablero */
+  .controls button{background:var(--panel);color:var(--text);border:0;border-radius:8px;padding:8px 14px;font-size:16px;cursor:pointer}  /* Estilo base de los botones de control */
+  .controls button:hover{background:#3a3733}  /* Botón ligeramente más claro al pasar el mouse */
+  .controls input[type=range]{flex:1;accent-color:var(--accent)}  /* El slider ocupa el espacio restante, en verde */
+  #result{font-weight:700;color:var(--accent)}  /* Texto del resultado de la partida en verde */
+  .bm{display:inline-block;background:var(--accent);color:#14120f;font-weight:700;padding:8px 14px;border-radius:8px;text-decoration:none;cursor:grab}  /* Botón-marcador (bookmarklet) para arrastrar a la barra */
+  #btnImport{display:block;margin-top:10px;width:min(480px,92vw);background:#4a7fb5;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;cursor:pointer}  /* Botón azul "importar al tablero de análisis" */
+  #btnImport:hover{background:#5a8fc5}  /* El botón de importar se aclara al pasar el mouse */
+  #analysis{margin-top:26px;padding-top:18px;border-top:2px dashed #555}  /* Sección del tablero de análisis, separada con línea punteada */
+  #analysis h1{font-size:18px}  /* Título de la sección de análisis, un poco más chico */
+  #sug2 .line{display:flex;gap:8px;align-items:baseline;padding:6px 8px;border-radius:6px;cursor:pointer;margin-bottom:4px;background:var(--panel2)}  /* Una línea de sugerencia del motor (clicable) */
+  #sug2 .line:hover{background:#3a3733}  /* La línea se aclara al pasar el mouse */
+  #sug2 .line .ev{font-weight:700;min-width:52px;color:var(--accent)}  /* Evaluación numérica de la línea (su color real se pone inline según la flecha) */
+  #sug2 .line .pv{color:var(--text);font-size:13px}  /* La continuación sugerida en notación SAN */
+  #sug2 .line:first-child .ev{color:#f7c631}  /* Color por defecto de la primera línea (se sobreescribe inline) */
+  #a2Hist{font-size:13px;color:var(--dim);margin-top:6px;word-break:break-word}  /* Historial de jugadas hechas en el tablero 2 */
+  #a2Hist b{color:var(--text)}  /* Las jugadas en sí resaltadas en color de texto normal */
+  #b2wrap{display:flex;gap:8px;align-items:stretch}  /* Contenedor: barra de evaluación + tablero 2, misma altura */
+  #b2rel{position:relative}  /* Contenedor relativo para poder superponer el SVG de flechas al tablero 2 */
+  #board2{width:min(454px,calc(92vw - 26px))}  /* El tablero 2 es un poco más angosto para dejar sitio a la barra de evaluación */
+  #arrows2{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}  /* Capa SVG de flechas: cubre todo el tablero 2 y no bloquea clics */
+  #evalBar{width:18px;border-radius:4px;overflow:hidden;background:#2b2926;position:relative;border:1px solid #555;flex:none}  /* Barra vertical de evaluación (el fondo oscuro representa a las negras) */
+  #evalFill{position:absolute;bottom:0;left:0;width:100%;height:50%;background:#eee;transition:height .5s}  /* Relleno blanco: crece desde abajo cuando las blancas van ganando */
+  #evalBar.flip #evalFill{bottom:auto;top:0}  /* Con el tablero girado, el relleno blanco se ancla arriba */
+  #evalBarTxt{position:absolute;bottom:3px;left:0;width:100%;text-align:center;font-size:9px;font-weight:700;mix-blend-mode:difference;color:#fff;z-index:1}  /* Numerito de la ventaja; mix-blend-mode lo hace legible sobre blanco y negro */
+  ol{margin:8px 0 0;padding-left:20px;color:var(--dim)} ol b{color:var(--text)}  /* Lista de instrucciones del bookmarklet */
+  #status{font-size:12px;color:var(--dim);margin-top:12px}  /* Línea de estado del servidor al pie del panel */
 </style>
 </head>
-<body>
-<div class="wrap">
-  <h1>♞ ZackWatch <span id="mode" class="badge">conectando…</span></h1>
-  <div class="sub">Partidas de <b>TheZackES</b> en chess.com — detección automática</div>
+<body>  <!-- Cuerpo: todo lo visible de la página -->
+<div class="wrap">  <!-- Contenedor centrado de toda la interfaz -->
+  <h1>♞ ZackWatch <span id="mode" class="badge">conectando…</span></h1>  <!-- Título + pildorita de estado (EN VIVO / ÚLTIMA PARTIDA) -->
+  <div class="sub">Partidas de <b>TheZackES</b> en chess.com — detección automática</div>  <!-- Subtítulo descriptivo -->
 
-  <div class="layout">
-    <div class="boardcol">
-      <div class="player"><span><span class="name" id="topName">—</span><span class="rating" id="topRating"></span></span><span class="clock" id="topClock">--:--</span></div>
-      <div id="board"></div>
-      <div class="player"><span><span class="name" id="botName">—</span><span class="rating" id="botRating"></span></span><span class="clock" id="botClock">--:--</span></div>
-      <div class="controls" id="replayControls" hidden>
-        <button id="btnStart" title="Inicio">⏮</button>
-        <button id="btnPrev" title="Anterior">◀</button>
-        <button id="btnPlay" title="Reproducir">▶</button>
-        <button id="btnNext" title="Siguiente">▶︎▶︎</button>
-        <input type="range" id="slider" min="0" max="0" value="0">
+  <div class="layout">  <!-- Fila principal: columna del tablero + columna lateral -->
+    <div class="boardcol">  <!-- Columna izquierda: tablero principal y sus controles -->
+      <div class="player"><span><span class="name" id="topName">—</span><span class="rating" id="topRating"></span></span><span class="clock" id="topClock">--:--</span></div>  <!-- Jugador de arriba (nombre, rating, reloj) -->
+      <div id="board"></div>  <!-- Tablero principal: las 64 casillas se generan por JavaScript -->
+      <div class="player"><span><span class="name" id="botName">—</span><span class="rating" id="botRating"></span></span><span class="clock" id="botClock">--:--</span></div>  <!-- Jugador de abajo -->
+      <div class="controls" id="replayControls" hidden>  <!-- Controles de replay (ocultos hasta que carga una partida) -->
+        <button id="btnStart" title="Inicio">⏮</button>  <!-- Ir a la posición inicial -->
+        <button id="btnPrev" title="Anterior">◀</button>  <!-- Retroceder una jugada -->
+        <button id="btnPlay" title="Reproducir">▶</button>  <!-- Reproducir/pausar automáticamente -->
+        <button id="btnNext" title="Siguiente">▶︎▶︎</button>  <!-- Avanzar una jugada -->
+        <input type="range" id="slider" min="0" max="0" value="0">  <!-- Slider para saltar a cualquier jugada -->
       </div>
-      <label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;color:var(--dim);width:min(480px,92vw)">
-        <input type="checkbox" id="safetyToggle" checked>
-        Piezas: <span style="color:#e02828">◤ expuesta</span> <span style="color:#f7c631">◤ en disputa</span> <span style="color:#81b64c">◤ protegida</span>
+      <label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;color:var(--dim);width:min(480px,92vw)">  <!-- Interruptor de los triangulitos de seguridad -->
+        <input type="checkbox" id="safetyToggle" checked>  <!-- Checkbox: activar/desactivar marcas de piezas -->
+        Piezas: <span style="color:#e02828">◤ expuesta</span> <span style="color:#f7c631">◤ en disputa</span> <span style="color:#81b64c">◤ protegida</span>  <!-- Leyenda de colores -->
       </label>
-      <div id="exploreBar" hidden>
-        <span>🧪 Explorando:</span><span id="exploreMoves"></span>
-        <button id="exploreBack">↩ Volver a la partida</button>
+      <div id="exploreBar" hidden>  <!-- Barra amarilla del modo exploración (oculta por defecto) -->
+        <span>🧪 Explorando:</span><span id="exploreMoves"></span>  <!-- Lista de jugadas exploradas -->
+        <button id="exploreBack">↩ Volver a la partida</button>  <!-- Botón para salir de la exploración -->
       </div>
-      <button id="btnImport" hidden>⤵ Importar posición al tablero de análisis</button>
-      <label id="autoImportLbl" hidden style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;color:var(--dim);width:min(480px,92vw)">
-        <input type="checkbox" id="autoImport">
+      <button id="btnImport" hidden>⤵ Importar posición al tablero de análisis</button>  <!-- Botón azul: copia la posición actual al tablero 2 -->
+      <label id="autoImportLbl" hidden style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;color:var(--dim);width:min(480px,92vw)">  <!-- Switch de importación automática -->
+        <input type="checkbox" id="autoImport">  <!-- Checkbox: si está activo, cada cambio de posición se importa solo -->
         Importar movimientos automáticamente al tablero de análisis
       </label>
     </div>
 
-    <div class="side">
-      <div class="card"><h2>Resultado</h2><div id="result">—</div><div id="tc" style="color:var(--dim);font-size:13px"></div></div>
-      <div class="card">
-        <h2>Análisis Stockfish <label style="float:right;font-weight:400;text-transform:none;letter-spacing:0"><input type="checkbox" id="suggestToggle" checked> activar</label></h2>
-        <div id="evalline" style="font-weight:700;font-size:18px">—</div>
-        <div id="bestmove" style="color:var(--dim)">cargando motor…</div>
-        <div style="color:var(--dim);font-size:12px;margin-top:6px">Solo en replay de partidas terminadas. En vivo se desactiva: usar motor durante la partida es trampa y chess.com banea por eso.</div>
+    <div class="side">  <!-- Columna derecha: tarjetas de información -->
+      <div class="card"><h2>Resultado</h2><div id="result">—</div><div id="tc" style="color:var(--dim);font-size:13px"></div></div>  <!-- Tarjeta: resultado y control de tiempo -->
+      <div class="card">  <!-- Tarjeta: análisis de Stockfish del tablero principal -->
+        <h2>Análisis Stockfish <label style="float:right;font-weight:400;text-transform:none;letter-spacing:0"><input type="checkbox" id="suggestToggle" checked> activar</label></h2>  <!-- Título + interruptor del motor -->
+        <div id="evalline" style="font-weight:700;font-size:18px">—</div>  <!-- Evaluación numérica de la posición mostrada -->
+        <div id="bestmove" style="color:var(--dim)">cargando motor…</div>  <!-- Mejor jugada sugerida / estado del motor -->
+        <div style="color:var(--dim);font-size:12px;margin-top:6px">Solo en replay de partidas terminadas. En vivo se desactiva: usar motor durante la partida es trampa y chess.com banea por eso.</div>  <!-- Aviso de fair play -->
       </div>
-      <div class="card"><h2>Jugadas</h2><div id="blunders" style="font-size:12px;color:var(--dim);margin-bottom:6px"></div><div id="moves">—</div></div>
-      <div class="card">
+      <div class="card"><h2>Jugadas</h2><div id="blunders" style="font-size:12px;color:var(--dim);margin-bottom:6px"></div><div id="moves">—</div></div>  <!-- Tarjeta: resumen de errores + lista de jugadas -->
+      <div class="card">  <!-- Tarjeta: instrucciones del modo en vivo -->
         <h2>Modo EN VIVO</h2>
-        <p style="margin:0 0 10px;font-size:13px;color:var(--dim)">Arrastra este botón a tu barra de marcadores. Cuando estés jugando en chess.com, haz clic en él y esta página mostrará tu tablero al segundo.</p>
-        <a class="bm" id="bm" href="#">🔴 ZackWatch Live</a>
-        <ol style="font-size:13px">
+        <p style="margin:0 0 10px;font-size:13px;color:var(--dim)">Arrastra este botón a tu barra de marcadores. Cuando estés jugando en chess.com, haz clic en él y esta página mostrará tu tablero al segundo.</p>  <!-- Explicación -->
+        <a class="bm" id="bm" href="#">🔴 ZackWatch Live</a>  <!-- El bookmarklet: su href se rellena por JavaScript -->
+        <ol style="font-size:13px">  <!-- Pasos de uso -->
           <li>Arrastra <b>🔴 ZackWatch Live</b> a la barra de marcadores (⌘⇧B si está oculta).</li>
           <li>Empieza tu partida en chess.com.</li>
           <li>Haz clic en el marcador <b>una vez por partida</b>.</li>
         </ol>
       </div>
-      <div id="status"></div>
+      <div id="status"></div>  <!-- Línea de estado de conexión con el servidor local -->
     </div>
   </div>
 
-  <div id="analysis" hidden>
-    <h1>🔬 Tablero de análisis</h1>
-    <div class="sub">Posición importada — mueve piezas libremente o toca una sugerencia para jugarla</div>
-    <div class="layout">
-      <div class="boardcol">
-        <div id="b2wrap">
-          <div id="evalBar"><div id="evalFill"></div><span id="evalBarTxt"></span></div>
-          <div id="board2"></div>
+  <div id="analysis" hidden>  <!-- Sección del tablero de análisis (oculta hasta la primera importación) -->
+    <h1>🔬 Tablero de análisis</h1>  <!-- Título de la sección -->
+    <div class="sub">Posición importada — mueve piezas libremente o toca una sugerencia para jugarla</div>  <!-- Subtítulo con instrucciones -->
+    <div class="layout">  <!-- Misma disposición: tablero a la izquierda, tarjetas a la derecha -->
+      <div class="boardcol">  <!-- Columna del tablero 2 -->
+        <div id="b2wrap">  <!-- Fila: barra de evaluación + tablero -->
+          <div id="evalBar"><div id="evalFill"></div><span id="evalBarTxt"></span></div>  <!-- Barra de evaluación: relleno blanco + numerito -->
+          <div id="b2rel">  <!-- Contenedor relativo para superponer las flechas -->
+            <div id="board2"></div>  <!-- Tablero de análisis: casillas generadas por JavaScript -->
+            <svg id="arrows2" viewBox="0 0 8 8"></svg>  <!-- Capa de flechas; viewBox 0..8 = 1 unidad por casilla -->
+          </div>
         </div>
-        <div class="controls">
-          <button id="a2Reset" title="Volver a la posición importada">⏮ Importada</button>
-          <button id="a2Undo" title="Deshacer jugada">↩ Deshacer</button>
-          <button id="a2Best" title="Jugar la mejor sugerencia">★ Jugar la mejor</button>
-          <button id="a2Flip" title="Girar tablero">🔄</button>
+        <div class="controls">  <!-- Botones del tablero de análisis -->
+          <button id="a2Reset" title="Volver a la posición importada">⏮ Importada</button>  <!-- Reinicia a la posición importada -->
+          <button id="a2Undo" title="Deshacer jugada">↩ Deshacer</button>  <!-- Deshace la última jugada del tablero 2 -->
+          <button id="a2Best" title="Jugar la mejor sugerencia">★ Jugar la mejor</button>  <!-- Juega la primera sugerencia del motor -->
+          <button id="a2Flip" title="Girar tablero">🔄</button>  <!-- Gira el tablero (y recuerda la orientación) -->
         </div>
       </div>
-      <div class="side">
-        <div class="card">
+      <div class="side">  <!-- Columna lateral de la sección de análisis -->
+        <div class="card">  <!-- Tarjeta: sugerencias del motor -->
           <h2>Sugerencias de continuación</h2>
-          <div id="eval2" style="font-weight:700;font-size:18px">—</div>
-          <div id="sug2" style="margin-top:8px">esperando posición…</div>
-          <div style="color:var(--dim);font-size:12px;margin-top:6px">Clic en una línea para jugar su primera jugada en el tablero.</div>
+          <div id="eval2" style="font-weight:700;font-size:18px">—</div>  <!-- Evaluación de la posición del tablero 2 -->
+          <div id="sug2" style="margin-top:8px">esperando posición…</div>  <!-- Aquí se insertan las 3 líneas sugeridas -->
+          <div style="color:var(--dim);font-size:12px;margin-top:6px">Clic en una línea para jugar su primera jugada en el tablero.</div>  <!-- Ayuda -->
         </div>
-        <div class="card">
+        <div class="card">  <!-- Tarjeta: historial del tablero 2 -->
           <h2>Jugadas en este tablero</h2>
-          <div id="a2Hist">—</div>
+          <div id="a2Hist">—</div>  <!-- Jugadas hechas desde la importación -->
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>  <!-- Librería chess.js: reglas de ajedrez (jugadas legales, SAN, FEN) -->
 <script>
+// ============================================================================
+// REFERENCIAS Y ESTADO GLOBAL
+// ============================================================================
+// Referencia al <div> del tablero principal (se usa constantemente)
 const boardEl=document.getElementById('board');
+// Atajo: $('id') equivale a document.getElementById('id')
 const $=id=>document.getElementById(id);
-let liveMode=false;
+// true cuando la interfaz está mostrando la partida en vivo (qué tablero se ve)
+let liveMode=false;   // modo de la interfaz (qué tablero se muestra)
+// Booleano que reporta el servidor: ¿hay una partida en vivo en este momento?
+let isLive=false;     // booleano del servidor: hay partida en vivo
+// Booleano que reporta el servidor: ¿está permitido usar el motor? (false durante partida en vivo, por fair play)
+let canUseStockfish=true;   // booleano del servidor: permiso para usar el motor (false durante partida en vivo)
 
-// Ataques/defensas de cada pieza (sin rayos X: cuenta el primer bloqueo)
+// ============================================================================
+// SEGURIDAD DE PIEZAS (triangulitos de colores)
+// Calcula, para cada pieza, cuántas piezas enemigas la atacan y cuántas
+// propias la defienden. Sin rayos X: una pieza bloqueada corta la línea.
+// ============================================================================
+// Direcciones de torre (vertical/horizontal) y de alfil (diagonales)
 const DIRS_R=[[1,0],[-1,0],[0,1],[0,-1]], DIRS_B=[[1,1],[1,-1],[-1,1],[-1,-1]];
+// Los 8 saltos posibles de un caballo
 const KNIGHT=[[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]];
 function computeSafety(grid){
+  // Devuelve true si la fila r y columna c caen dentro del tablero
   const inB=(r,c)=>r>=0&&r<8&&c>=0&&c<8;
+  // Cuenta cuántas piezas del color dado ("white"=blancas) atacan la casilla (r,c)
   function attackers(r,c,white){
-    let n=0;
+    let n=0;   // contador de atacantes
     const pr=white?r+1:r-1;                      // peones (fila 0 = octava)
+    // Un peón ataca en diagonal: revisa las dos columnas vecinas en la fila pr
     for(const dc of[-1,1]) if(inB(pr,c+dc)&&grid[pr][c+dc]===(white?'P':'p'))n++;
+    // Caballos: revisa los 8 saltos de caballo desde la casilla
     for(const[dr,dc]of KNIGHT) if(inB(r+dr,c+dc)&&grid[r+dr][c+dc]===(white?'N':'n'))n++;
+    // Rey: revisa las 8 casillas adyacentes
     for(const[dr,dc]of[...DIRS_R,...DIRS_B]) if(inB(r+dr,c+dc)&&grid[r+dr][c+dc]===(white?'K':'k'))n++;
+    // Torres y damas: recorre cada línea recta hasta chocar con una pieza
     for(const[dr,dc]of DIRS_R){
-      let rr=r+dr,cc=c+dc;
-      while(inB(rr,cc)){const p=grid[rr][cc];if(p){if(white?(p==='R'||p==='Q'):(p==='r'||p==='q'))n++;break;}rr+=dr;cc+=dc;}
+      let rr=r+dr,cc=c+dc;   // avanza casilla por casilla en esa dirección
+      while(inB(rr,cc)){const p=grid[rr][cc];if(p){if(white?(p==='R'||p==='Q'):(p==='r'||p==='q'))n++;break;}rr+=dr;cc+=dc;}   // si la primera pieza es torre/dama del color, cuenta; luego corta
     }
+    // Alfiles y damas: igual pero por las diagonales
     for(const[dr,dc]of DIRS_B){
-      let rr=r+dr,cc=c+dc;
-      while(inB(rr,cc)){const p=grid[rr][cc];if(p){if(white?(p==='B'||p==='Q'):(p==='b'||p==='q'))n++;break;}rr+=dr;cc+=dc;}
+      let rr=r+dr,cc=c+dc;   // avanza por la diagonal
+      while(inB(rr,cc)){const p=grid[rr][cc];if(p){if(white?(p==='B'||p==='Q'):(p==='b'||p==='q'))n++;break;}rr+=dr;cc+=dc;}   // primera pieza encontrada decide y corta la línea
     }
-    return n;
+    return n;   // total de atacantes de ese color sobre la casilla
   }
-  const marks={};
+  const marks={};   // resultado: { "e4": "danger", "c6": "safe", ... }
+  // Recorre las 64 casillas buscando piezas que marcar
   for(let r=0;r<8;r++)for(let c=0;c<8;c++){
-    const p=grid[r][c];
+    const p=grid[r][c];   // pieza en esa casilla ('' si está vacía)
     if(!p||p.toLowerCase()==='k')continue;       // el rey no se marca
-    const isW=p===p.toUpperCase();
-    const atk=attackers(r,c,!isW), def=attackers(r,c,isW);
-    let cls=null;
-    if(atk>0&&def===0)cls='danger';
-    else if(atk>0)cls='warn';
-    else if(def>0)cls='safe';
-    if(cls)marks['abcdefgh'[c]+(8-r)]=cls;
+    const isW=p===p.toUpperCase();   // mayúscula = pieza blanca
+    const atk=attackers(r,c,!isW), def=attackers(r,c,isW);   // atacantes enemigos y defensores propios
+    let cls=null;   // clase CSS a asignar (o ninguna)
+    if(atk>0&&def===0)cls='danger';        // atacada y sin defensa → rojo
+    else if(atk>0)cls='warn';              // atacada pero defendida → amarillo
+    else if(def>0)cls='safe';              // solo defendida → verde
+    if(cls)marks['abcdefgh'[c]+(8-r)]=cls; // guarda la marca con el nombre de la casilla (ej. "e4")
   }
-  return marks;
+  return marks;   // mapa de casilla → clase de color
 }
 
+// ============================================================================
+// DIBUJO DE TABLEROS
+// ============================================================================
+// Última posición y orientación dibujadas en el tablero PRINCIPAL
 let fenShown='', flipShown=false;
+// Dibuja el tablero principal y recuerda qué se mostró (para el análisis)
 function renderFen(fen,flip,hl){
-  fenShown=fen; flipShown=flip;
-  drawBoard(boardEl,fen,flip,hl);
+  fenShown=fen; flipShown=flip;   // guarda posición y orientación actuales
+  drawBoard(boardEl,fen,flip,hl); // delega el dibujo a la función genérica
 }
+// Dibuja CUALQUIER tablero (el principal o el de análisis) dentro del elemento "el"
+// fen = posición; flip = true si las negras van abajo; hl = [origen,destino] a resaltar
 function drawBoard(el,fen,flip,hl){
-  const rows=fen.split(' ')[0].split('/');
-  const grid=[];
+  const rows=fen.split(' ')[0].split('/');   // toma solo la parte de piezas del FEN y la corta por filas
+  const grid=[];   // matriz 8x8 con las piezas ('' = casilla vacía)
+  // Expande cada fila del FEN: los dígitos son casillas vacías consecutivas
   for(const row of rows){
-    const r=[];
+    const r=[];   // fila expandida
     for(const ch of row){
-      if(/\d/.test(ch)) for(let i=0;i<+ch;i++) r.push('');
-      else r.push(ch);
+      if(/\d/.test(ch)) for(let i=0;i<+ch;i++) r.push('');   // dígito N → N casillas vacías
+      else r.push(ch);   // letra → esa pieza
     }
-    grid.push(r);
+    grid.push(r);   // agrega la fila completa a la matriz
   }
-  el.innerHTML='';
-  const marks=$('safetyToggle').checked?computeSafety(grid):{};
+  el.innerHTML='';   // borra el tablero anterior
+  const marks=$('safetyToggle').checked?computeSafety(grid):{};   // calcula los triangulitos (si el toggle está activo)
   const ranks=[...Array(8).keys()];       // 0..7 = fila 8..1 del FEN
-  const files=[...Array(8).keys()];
-  const R=flip?[...ranks].reverse():ranks, F=flip?[...files].reverse():files;
+  const files=[...Array(8).keys()];       // 0..7 = columnas a..h
+  const R=flip?[...ranks].reverse():ranks, F=flip?[...files].reverse():files;   // si está girado, recorre al revés
+  // Crea las 64 casillas en el orden visual correcto
   for(const ri of R) for(const fi of F){
-    const sq=document.createElement('div');
-    const name='abcdefgh'[fi]+(8-ri);
-    let cls='sq '+(((ri+fi)%2===0)?'l':'d');
-    if(hl&&hl[0]===name)cls+=' hlf';
-    if(hl&&hl[1]===name)cls+=' hlt';
-    if(marks[name])cls+=' '+marks[name];
-    sq.className=cls;
-    sq.dataset.sq=name;
-    const p=grid[ri][fi];
+    const sq=document.createElement('div');   // la casilla es un <div>
+    const name='abcdefgh'[fi]+(8-ri);         // nombre algebraico, ej. "e4"
+    let cls='sq '+(((ri+fi)%2===0)?'l':'d');  // clara u oscura según el patrón de ajedrez
+    if(hl&&hl[0]===name)cls+=' hlf';          // ¿es el origen de la jugada resaltada?
+    if(hl&&hl[1]===name)cls+=' hlt';          // ¿es el destino de la jugada resaltada?
+    if(marks[name])cls+=' '+marks[name];      // ¿lleva triangulito de seguridad?
+    sq.className=cls;                         // aplica todas las clases
+    sq.dataset.sq=name;                       // guarda el nombre en data-sq (para los clics)
+    const p=grid[ri][fi];                     // pieza que va en esta casilla
     if(p){
-      const isW=p===p.toUpperCase();
-      const s=document.createElement('img');
-      s.className=isW?'wp':'bp';
-      s.src=`/static/pieces/${isW?'w':'b'}${p.toUpperCase()}.svg`;
-      s.alt=p; s.draggable=false;
-      sq.appendChild(s);
+      const isW=p===p.toUpperCase();          // mayúscula = blanca
+      const s=document.createElement('img');  // la pieza es una imagen SVG
+      s.className=isW?'wp':'bp';              // clase para la sombra correcta
+      s.src=`/static/pieces/${isW?'w':'b'}${p.toUpperCase()}.svg`;   // ruta del SVG, ej. /static/pieces/wN.svg
+      s.alt=p; s.draggable=false;             // texto alternativo y sin arrastre nativo
+      sq.appendChild(s);                      // mete la pieza en la casilla
     }
-    el.appendChild(sq);
+    el.appendChild(sq);                       // mete la casilla en el tablero
   }
 }
+// Dibuja la posición inicial al cargar la página (antes de que llegue cualquier partida)
 renderFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",false);
 
+// Convierte décimas de segundo a formato "m:ss" (los relojes de chess.com vienen en décimas)
 function fmtTenths(t){const s=Math.max(0,Math.floor(t/10));return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;}
 
-// ---- motor Stockfish (solo replay) ----
+// ============================================================================
+// MOTOR STOCKFISH (solo cuando canUseStockfish lo permite — fair play)
+// El motor corre en un Web Worker y procesa una cola de trabajos, uno a la vez.
+// ============================================================================
+// engine = el Worker · engineReady = ya respondió "uciok" · lastInfo/lastInfos = últimos resultados parseados
 let engine=null, engineReady=false, lastInfo=null, lastInfos=[];
+// jobQueue = trabajos pendientes · currentJob = trabajo en ejecución
 let jobQueue=[], currentJob=null;
+// Toma el siguiente trabajo de la cola y se lo manda al motor (si está libre)
 function pump(){
-  if(!engineReady||currentJob||jobQueue.length===0)return;
-  currentJob=jobQueue.shift(); lastInfo=null; lastInfos=[];
-  engine.postMessage('setoption name MultiPV value '+(currentJob.multipv||1));
-  engine.postMessage('position fen '+currentJob.fen);
-  engine.postMessage('go depth '+currentJob.depth);
+  if(!engineReady||currentJob||jobQueue.length===0)return;   // motor ocupado, no listo, o nada que hacer
+  currentJob=jobQueue.shift(); lastInfo=null; lastInfos=[];  // saca el trabajo y limpia resultados anteriores
+  engine.postMessage('setoption name MultiPV value '+(currentJob.multipv||1));   // cuántas líneas alternativas calcular (1 por defecto, 3 para el tablero 2)
+  engine.postMessage('position fen '+currentJob.fen);        // posición a analizar
+  engine.postMessage('go depth '+currentJob.depth);          // profundidad de búsqueda
 }
+// Agrega un trabajo a la cola; front=true lo pone al principio (prioridad)
 function enqueue(job,front){ if(front)jobQueue.unshift(job); else jobQueue.push(job); pump(); }
+// Descarga stockfish.js del CDN y lo arranca como Web Worker
 async function initEngine(){
   try{
-    const r=await fetch('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js');
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    engine=new Worker(URL.createObjectURL(await r.blob()));
-    engine.onmessage=e=>onEngine(String(e.data));
-    engine.postMessage('uci');
-  }catch(e){ $('bestmove').textContent='Motor no disponible (se necesita internet): '+e.message; }
+    const r=await fetch('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js');   // descarga el código del motor
+    if(!r.ok)throw new Error('HTTP '+r.status);                     // falla si el CDN no responde bien
+    engine=new Worker(URL.createObjectURL(await r.blob()));         // crea el Worker desde el blob descargado
+    engine.onmessage=e=>onEngine(String(e.data));                   // cada línea que emite el motor pasa por onEngine
+    engine.postMessage('uci');                                      // saludo del protocolo UCI
+  }catch(e){ $('bestmove').textContent='Motor no disponible (se necesita internet): '+e.message; }   // sin internet: avisa y sigue sin motor
 }
+// Convierte la evaluación (que el motor da desde el punto de vista del que mueve)
+// a "centipeones desde el punto de vista de las BLANCAS" (positivo = ventaja blanca)
 function toWhiteEval(info,fen){
-  if(!info)return null;
-  let v=info.mate!=null?(info.mate>0?1500:-1500):Math.max(-1500,Math.min(1500,info.cp||0));
-  return fen.split(' ')[1]==='b'?-v:v;
+  if(!info)return null;   // sin información, no hay evaluación
+  let v=info.mate!=null?(info.mate>0?1500:-1500):Math.max(-1500,Math.min(1500,info.cp||0));   // mate = ±1500 tope; si no, centipeones acotados a ±1500
+  return fen.split(' ')[1]==='b'?-v:v;   // si mueven negras, invierte el signo para dejarlo "desde blancas"
 }
+// Procesa cada línea de texto que emite el motor (protocolo UCI)
 function onEngine(line){
-  if(line==='uciok'){engineReady=true;$('bestmove').textContent='motor listo';pump();return;}
+  if(line==='uciok'){engineReady=true;$('bestmove').textContent='motor listo';pump();return;}   // el motor terminó de inicializar: arranca la cola
+  // Las líneas "info ... pv ..." traen evaluación y variante principal parciales
   if(line.startsWith('info')&&line.includes(' pv ')){
-    const cp=line.match(/score cp (-?\d+)/), mate=line.match(/score mate (-?\d+)/);
-    const mp=line.match(/multipv (\d+)/), pv=line.match(/ pv (.+)$/);
-    const info={cp:cp?+cp[1]:null, mate:mate?+mate[1]:null, pv:pv?pv[1].trim().split(/\s+/):[]};
-    const idx=mp?+mp[1]-1:0;
-    lastInfos[idx]=info;
-    if(idx===0)lastInfo=info;
+    const cp=line.match(/score cp (-?\d+)/), mate=line.match(/score mate (-?\d+)/);   // extrae centipeones o mate-en-N
+    const mp=line.match(/multipv (\d+)/), pv=line.match(/ pv (.+)$/);                 // número de línea (MultiPV) y la variante en UCI
+    const info={cp:cp?+cp[1]:null, mate:mate?+mate[1]:null, pv:pv?pv[1].trim().split(/\s+/):[]};   // empaqueta todo
+    const idx=mp?+mp[1]-1:0;    // índice de la línea: multipv 1 → índice 0
+    lastInfos[idx]=info;        // guarda esta línea en su posición
+    if(idx===0)lastInfo=info;   // la línea 1 también se guarda como "la principal"
   }
+  // "bestmove ..." marca el final del análisis del trabajo actual
   if(line.startsWith('bestmove')){
-    const job=currentJob; currentJob=null;
-    if(job)job.cb(lastInfo,line.split(' ')[1],lastInfos);
-    pump();
+    const job=currentJob; currentJob=null;             // libera el motor
+    if(job)job.cb(lastInfo,line.split(' ')[1],lastInfos);   // entrega resultados al callback del trabajo
+    pump();                                            // y procesa el siguiente de la cola
   }
 }
+// Analiza la posición mostrada en el tablero PRINCIPAL (sugerencia simple)
 function analyze(fen){
-  if(!engineReady||!$('suggestToggle').checked||liveMode)return;
-  jobQueue=jobQueue.filter(j=>j.kind!=='ui');
-  $('evalline').textContent='…'; $('bestmove').textContent='analizando…';
+  if(!engineReady||!$('suggestToggle').checked||!canUseStockfish)return;   // sin motor, toggle apagado, o motor prohibido (partida en vivo): no hace nada
+  jobQueue=jobQueue.filter(j=>j.kind!=='ui');   // descarta análisis de interfaz pendientes (ya son viejos)
+  $('evalline').textContent='…'; $('bestmove').textContent='analizando…';   // feedback inmediato
+  // Encola el análisis con prioridad (front=true); el callback pinta el resultado
   enqueue({kind:'ui',fen,depth:13,cb:(info,mv)=>{
-    if(fen!==fenShown||!info||!mv||mv==='(none)')return;
-    const v=toWhiteEval(info,fen);
-    let evalTxt;
-    if(info.mate!=null){const m=fen.split(' ')[1]==='b'?-info.mate:info.mate;evalTxt=(m>0?'+M':'-M')+Math.abs(m);}
-    else evalTxt=(v>0?'+':'')+(v/100).toFixed(2);
-    $('evalline').textContent=evalTxt;
-    $('bestmove').textContent=`Mejor jugada: ${mv.slice(0,2)} → ${mv.slice(2,4)}`+(mv.length>4?` (corona ${mv[4].toUpperCase()})`:'');
-    renderFen(fenShown,flipShown,[mv.slice(0,2),mv.slice(2,4)]);
+    if(fen!==fenShown||!info||!mv||mv==='(none)')return;   // la posición ya cambió o no hay jugada: descarta
+    const v=toWhiteEval(info,fen);   // evaluación desde blancas
+    let evalTxt;   // texto a mostrar
+    if(info.mate!=null){const m=fen.split(' ')[1]==='b'?-info.mate:info.mate;evalTxt=(m>0?'+M':'-M')+Math.abs(m);}   // mate forzado: "+M3" / "-M2"
+    else evalTxt=(v>0?'+':'')+(v/100).toFixed(2);   // si no, peones con signo: "+0.45"
+    $('evalline').textContent=evalTxt;   // pinta la evaluación
+    $('bestmove').textContent=`Mejor jugada: ${mv.slice(0,2)} → ${mv.slice(2,4)}`+(mv.length>4?` (corona ${mv[4].toUpperCase()})`:'');   // describe la mejor jugada (y la coronación si la hay)
+    renderFen(fenShown,flipShown,[mv.slice(0,2),mv.slice(2,4)]);   // redibuja resaltando origen y destino
   }},true);
   if(currentJob)engine.postMessage('stop');   // acelera: aborta el análisis en curso
 }
+// Evalúa TODAS las posiciones de la partida para detectar errores (??, ?, ?!)
 function analyzeGameErrors(g){
-  if(g.evals)return;
-  if(!engineReady){setTimeout(()=>analyzeGameErrors(g),800);return;}
-  g.evals=new Array(g.fens.length).fill(null);
-  let done=0; const total=g.fens.length;
-  $('blunders').textContent=`Buscando errores… 0/${total}`;
+  if(g.evals||!canUseStockfish)return;   // ya se analizó, o el motor está prohibido: no hace nada
+  if(!engineReady){setTimeout(()=>analyzeGameErrors(g),800);return;}   // motor aún cargando: reintenta en 800 ms
+  g.evals=new Array(g.fens.length).fill(null);   // array de evaluaciones, una por posición
+  let done=0; const total=g.fens.length;         // progreso del análisis por lotes
+  $('blunders').textContent=`Buscando errores… 0/${total}`;   // muestra el progreso inicial
+  // Encola un trabajo por cada posición de la partida
   g.fens.forEach((fen,i)=>{
     enqueue({kind:'batch',fen,depth:12,cb:(info)=>{
-      if(game!==g)return;
-      g.evals[i]=toWhiteEval(info,fen);
-      done++;
-      if(done<total)$('blunders').textContent=`Buscando errores… ${done}/${total}`;
-      else markErrors(g);
+      if(game!==g)return;   // ya se cargó otra partida: descarta este resultado
+      g.evals[i]=toWhiteEval(info,fen);   // guarda la evaluación de esta posición
+      done++;   // una posición más terminada
+      if(done<total)$('blunders').textContent=`Buscando errores… ${done}/${total}`;   // actualiza el progreso
+      else markErrors(g);   // todas listas: marca los errores en la lista de jugadas
     }});
   });
 }
+// Clasifica la pérdida de evaluación de una jugada: cuánto empeoró tu posición
 function classify(loss){
-  if(loss>=200)return['??','#fa412d'];
-  if(loss>=100)return['?','#ffa459'];
-  if(loss>=50)return['?!','#f7c631'];
-  return null;
+  if(loss>=200)return['??','#fa412d'];   // perder 2+ peones de evaluación = blunder (??)
+  if(loss>=100)return['?','#ffa459'];    // 1-2 peones = error (?)
+  if(loss>=50)return['?!','#f7c631'];    // 0.5-1 peón = imprecisión (?!)
+  return null;                           // menos de medio peón: jugada aceptable
 }
+// Pone los símbolos ??/?/?! junto a cada jugada mala y resume tus errores
 function markErrors(g){
-  const mvs=document.querySelectorAll('#moves .mv');
-  const mine={'??':0,'?':0,'?!':0};
+  const mvs=document.querySelectorAll('#moves .mv');   // todos los <span> de jugadas de la lista
+  const mine={'??':0,'?':0,'?!':0};                    // contador de TUS errores
+  // Compara la evaluación antes y después de cada jugada
   for(let i=0;i<g.sans.length;i++){
-    const before=g.evals[i], after=g.evals[i+1];
-    if(before==null||after==null)continue;
-    const whiteMove=i%2===0;
-    const c=classify(whiteMove?before-after:after-before);
+    const before=g.evals[i], after=g.evals[i+1];   // evaluación antes y después de la jugada i
+    if(before==null||after==null)continue;         // falta alguna evaluación: no se puede juzgar
+    const whiteMove=i%2===0;                       // jugadas pares = blancas
+    const c=classify(whiteMove?before-after:after-before);   // pérdida desde el punto de vista del que movió
     if(c&&mvs[i]){
-      mvs[i].insertAdjacentHTML('beforeend',` <b style="color:${c[1]}">${c[0]}</b>`);
-      if(whiteMove!==g.userIsBlack)mine[c[0]]++;
+      mvs[i].insertAdjacentHTML('beforeend',` <b style="color:${c[1]}">${c[0]}</b>`);   // añade el símbolo coloreado a la jugada
+      if(whiteMove!==g.userIsBlack)mine[c[0]]++;   // si la jugada era TUYA, cuenta el error como tuyo
     }
   }
-  $('blunders').innerHTML=`Tus errores: <b style="color:#fa412d">${mine['??']} ??</b> · <b style="color:#ffa459">${mine['?']} ?</b> · <b style="color:#f7c631">${mine['?!']} ?!</b> — clic en una jugada para verla`;
+  $('blunders').innerHTML=`Tus errores: <b style="color:#fa412d">${mine['??']} ??</b> · <b style="color:#ffa459">${mine['?']} ?</b> · <b style="color:#f7c631">${mine['?!']} ?!</b> — clic en una jugada para verla`;   // resumen final
 }
+// Escucha los dos toggles (motor y triangulitos) y reacciona a sus cambios
 document.addEventListener('change',e=>{
-  if(e.target.id==='suggestToggle'){
-    if(e.target.checked&&game&&!liveMode){analyze(game.fens[ply]);analyzeGameErrors(game);}
-    else{$('evalline').textContent='—';$('bestmove').textContent='desactivado';if(game&&!liveMode)renderFen(game.fens[ply],game.userIsBlack);}
+  if(e.target.id==='suggestToggle'){   // interruptor del motor
+    if(e.target.checked&&game&&!liveMode){analyze(game.fens[ply]);analyzeGameErrors(game);}   // se encendió: analiza la posición actual y los errores
+    else{$('evalline').textContent='—';$('bestmove').textContent='desactivado';if(game&&!liveMode)renderFen(game.fens[ply],game.userIsBlack);}   // se apagó: limpia y quita el resaltado
   }
-  if(e.target.id==='safetyToggle'&&game&&!liveMode)renderFen(game.fens[ply],game.userIsBlack);
+  if(e.target.id==='safetyToggle'&&game&&!liveMode)renderFen(game.fens[ply],game.userIsBlack);   // interruptor de triangulitos: redibuja el tablero
 });
+// Arranca la descarga e inicialización del motor al cargar la página
 initEngine();
 
-// ---- replay ----
+// ============================================================================
+// REPLAY DE LA PARTIDA (tablero principal)
+// ============================================================================
+// game = partida cargada · ply = media-jugada mostrada · playing = timer de reproducción automática
 let game=null, ply=0, playing=null;
+// Muestra la posición número p de la partida (0 = inicial)
 function setPly(p){
-  if(!game)return;
-  explore=null; selSq=null; $('exploreBar').hidden=true;
-  ply=Math.max(0,Math.min(p,game.fens.length-1));
-  renderFen(game.fens[ply],game.userIsBlack);
-  analyze(game.fens[ply]);
-  maybeAutoImport();
-  $('slider').value=ply;
+  if(!game)return;   // sin partida cargada no hay nada que mostrar
+  explore=null; selSq=null; $('exploreBar').hidden=true;   // salir del modo exploración si estaba activo
+  ply=Math.max(0,Math.min(p,game.fens.length-1));   // acota p al rango válido
+  renderFen(game.fens[ply],game.userIsBlack);       // dibuja la posición (orientada a tu color)
+  analyze(game.fens[ply]);                          // pide análisis de esta posición
+  maybeAutoImport();                                // si el switch automático está activo, replica al tablero 2
+  $('slider').value=ply;                            // sincroniza el slider
   // relojes en este ply
-  let w=null,b=null;
-  for(let i=0;i<Math.min(ply,game.clocks.length);i++){ if(i%2===0)w=game.clocks[i]; else b=game.clocks[i]; }
-  const wTxt=w!=null?fmtTenths(w):'--:--', bTxt=b!=null?fmtTenths(b):'--:--';
-  const names=playersOriented();
-  $('topClock').textContent=game.userIsBlack?wTxt:bTxt;
-  $('botClock').textContent=game.userIsBlack?bTxt:wTxt;
-  document.querySelectorAll('#moves .mv').forEach((el,i)=>el.classList.toggle('cur',i===ply-1));
-  const cur=document.querySelector('#moves .mv.cur'); if(cur)cur.scrollIntoView({block:'nearest'});
+  let w=null,b=null;   // último reloj conocido de blancas y negras hasta este punto
+  for(let i=0;i<Math.min(ply,game.clocks.length);i++){ if(i%2===0)w=game.clocks[i]; else b=game.clocks[i]; }   // los relojes alternan blancas/negras por jugada
+  const wTxt=w!=null?fmtTenths(w):'--:--', bTxt=b!=null?fmtTenths(b):'--:--';   // formatea (o guiones si no hay dato)
+  const names=playersOriented();   // refresca nombres arriba/abajo según tu color
+  $('topClock').textContent=game.userIsBlack?wTxt:bTxt;   // reloj de arriba = el del rival
+  $('botClock').textContent=game.userIsBlack?bTxt:wTxt;   // reloj de abajo = el tuyo
+  document.querySelectorAll('#moves .mv').forEach((el,i)=>el.classList.toggle('cur',i===ply-1));   // resalta la jugada actual en la lista
+  const cur=document.querySelector('#moves .mv.cur'); if(cur)cur.scrollIntoView({block:'nearest'});   // y la mantiene visible en el scroll
 }
+// Coloca los nombres/ratings: tu lado siempre abajo
 function playersOriented(){
-  const u=game.userIsBlack;
-  const top=u?game.white:game.black, bot=u?game.black:game.white;
-  $('topName').textContent=top.name; $('topRating').textContent=top.rating?`(${top.rating})`:'';
-  $('botName').textContent=bot.name; $('botRating').textContent=bot.rating?`(${bot.rating})`:'';
+  const u=game.userIsBlack;   // ¿jugaste con negras?
+  const top=u?game.white:game.black, bot=u?game.black:game.white;   // arriba el rival, abajo tú
+  $('topName').textContent=top.name; $('topRating').textContent=top.rating?`(${top.rating})`:'';   // nombre y rating de arriba
+  $('botName').textContent=bot.name; $('botRating').textContent=bot.rating?`(${bot.rating})`:'';   // nombre y rating de abajo
 }
+// Carga una partida terminada en la interfaz de replay
 function loadGame(g){
-  game=g; playersOriented();
-  $('result').textContent=g.result||'—';
-  $('tc').textContent=g.timeControl?`Control de tiempo: ${g.timeControl}`:'';
-  $('slider').max=g.fens.length-1;
-  const mv=$('moves'); mv.innerHTML='';
+  game=g; playersOriented();   // guarda la partida y pinta los jugadores
+  $('result').textContent=g.result||'—';   // resultado ("Fulano won by checkmate", etc.)
+  $('tc').textContent=g.timeControl?`Control de tiempo: ${g.timeControl}`:'';   // control de tiempo (ej. "180")
+  $('slider').max=g.fens.length-1;   // el slider abarca todas las posiciones
+  const mv=$('moves'); mv.innerHTML='';   // limpia la lista de jugadas
+  // Construye la lista: una fila por jugada completa (blanca + negra)
   for(let i=0;i<g.sans.length;i+=2){
-    const row=document.createElement('div');row.className='row';
-    row.innerHTML=`<span class="num">${i/2+1}.</span><span class="mv" data-p="${i+1}">${g.sans[i]}</span><span class="mv" data-p="${i+2}">${g.sans[i+1]||''}</span>`;
-    mv.appendChild(row);
+    const row=document.createElement('div');row.className='row';   // fila nueva
+    row.innerHTML=`<span class="num">${i/2+1}.</span><span class="mv" data-p="${i+1}">${g.sans[i]}</span><span class="mv" data-p="${i+2}">${g.sans[i+1]||''}</span>`;   // número + las dos medias jugadas; data-p = a qué ply saltar
+    mv.appendChild(row);   // agrega la fila a la lista
   }
-  mv.onclick=e=>{const el=e.target.closest('.mv');if(el&&el.dataset.p){stopPlay();setPly(+el.dataset.p);}};
-  $('replayControls').hidden=false;
-  $('btnImport').hidden=false; $('autoImportLbl').hidden=false;
-  $('blunders').textContent='';
-  jobQueue=jobQueue.filter(j=>j.kind!=='batch');
-  setPly(g.fens.length-1);
-  if($('suggestToggle').checked)analyzeGameErrors(g);
+  mv.onclick=e=>{const el=e.target.closest('.mv');if(el&&el.dataset.p){stopPlay();setPly(+el.dataset.p);}};   // clic en una jugada → salta a esa posición
+  $('replayControls').hidden=false;   // muestra los controles de replay
+  $('btnImport').hidden=false; $('autoImportLbl').hidden=false;   // muestra el botón de importar y el switch automático
+  $('blunders').textContent='';   // limpia el resumen de errores anterior
+  jobQueue=jobQueue.filter(j=>j.kind!=='batch');   // cancela análisis por lotes de la partida anterior
+  setPly(g.fens.length-1);   // muestra la posición final
+  if($('suggestToggle').checked)analyzeGameErrors(g);   // y lanza la búsqueda de errores si el motor está activo
 }
+// Detiene la reproducción automática si está corriendo
 function stopPlay(){if(playing){clearInterval(playing);playing=null;$('btnPlay').textContent='▶';}}
-$('btnStart').onclick=()=>{stopPlay();setPly(0);};
-$('btnPrev').onclick=()=>{stopPlay();setPly(ply-1);};
-$('btnNext').onclick=()=>{stopPlay();setPly(ply+1);};
+$('btnStart').onclick=()=>{stopPlay();setPly(0);};      // ⏮ ir al inicio
+$('btnPrev').onclick=()=>{stopPlay();setPly(ply-1);};   // ◀ una jugada atrás
+$('btnNext').onclick=()=>{stopPlay();setPly(ply+1);};   // ▶︎▶︎ una jugada adelante
+// ▶ reproducir / pausar
 $('btnPlay').onclick=()=>{
-  if(playing){stopPlay();return;}
-  if(ply>=game.fens.length-1)setPly(0);
-  $('btnPlay').textContent='⏸';
-  playing=setInterval(()=>{ if(ply>=game.fens.length-1)stopPlay(); else setPly(ply+1); },600);
+  if(playing){stopPlay();return;}          // si ya reproduce, pausa
+  if(ply>=game.fens.length-1)setPly(0);    // si estaba al final, arranca desde el inicio
+  $('btnPlay').textContent='⏸';            // cambia el ícono a pausa
+  playing=setInterval(()=>{ if(ply>=game.fens.length-1)stopPlay(); else setPly(ply+1); },600);   // avanza una jugada cada 600 ms
 };
-$('slider').oninput=e=>{stopPlay();setPly(+e.target.value);};
+$('slider').oninput=e=>{stopPlay();setPly(+e.target.value);};   // arrastrar el slider salta a esa jugada
 
-// ---- exploración: mueve piezas desde cualquier posición del replay ----
+// ============================================================================
+// MODO EXPLORACIÓN (tablero principal): mueve piezas desde cualquier posición
+// ============================================================================
+// explore = {chess, sans} si estás explorando · selSq = casilla seleccionada
 let explore=null, selSq=null;
+// La posición "base" actual: la explorada si existe, si no la del replay
 function baseFen(){ return explore?explore.chess.fen():(game?game.fens[ply]:null); }
+// Redibuja el tablero marcando la casilla seleccionada y sus destinos legales
 function paintSelection(targets,sel){
-  renderFen(baseFen(),game.userIsBlack);
-  const q=n=>boardEl.querySelector(`[data-sq="${n}"]`);
-  const s=q(sel); if(s)s.classList.add('sel');
-  targets.forEach(t=>{const el=q(t);if(el)el.classList.add('dot');});
+  renderFen(baseFen(),game.userIsBlack);   // redibuja limpio primero
+  const q=n=>boardEl.querySelector(`[data-sq="${n}"]`);   // helper: busca una casilla por nombre
+  const s=q(sel); if(s)s.classList.add('sel');            // marco azul en la seleccionada
+  targets.forEach(t=>{const el=q(t);if(el)el.classList.add('dot');});   // punto en cada destino legal
 }
+// Manejador de clics sobre el tablero principal
 boardEl.addEventListener('click',e=>{
-  if(!game||liveMode)return;
-  if(typeof Chess==='undefined'){$('bestmove').textContent='chess.js no cargó (se necesita internet para explorar)';return;}
-  const sqEl=e.target.closest('.sq'); if(!sqEl)return;
-  stopPlay();
-  const sqName=sqEl.dataset.sq;
-  const fen=baseFen(); if(!fen)return;
-  const c=new Chess(fen);
+  if(!game||liveMode)return;   // sin partida, o en vivo (en vivo no se explora): ignora
+  if(typeof Chess==='undefined'){$('bestmove').textContent='chess.js no cargó (se necesita internet para explorar)';return;}   // sin chess.js no hay reglas
+  const sqEl=e.target.closest('.sq'); if(!sqEl)return;   // encuentra la casilla clicada
+  stopPlay();   // pausa la reproducción automática
+  const sqName=sqEl.dataset.sq;   // nombre de la casilla (ej. "e4")
+  const fen=baseFen(); if(!fen)return;   // posición desde la que se juega
+  const c=new Chess(fen);   // instancia de chess.js para validar jugadas
+  // ¿Había una pieza seleccionada y se clicó otra casilla? → intenta mover
   if(selSq&&selSq!==sqName){
-    const mv=c.move({from:selSq,to:sqName,promotion:'q'});
-    if(mv){
-      if(!explore)explore={sans:[]};
-      explore.chess=c; explore.sans.push(mv.san);
-      selSq=null;
-      renderFen(c.fen(),game.userIsBlack);
-      $('exploreBar').hidden=false;
-      $('exploreMoves').textContent=explore.sans.join(' ');
-      analyze(c.fen());
-      maybeAutoImport();
-      return;
+    const mv=c.move({from:selSq,to:sqName,promotion:'q'});   // intenta la jugada (corona dama por defecto)
+    if(mv){   // la jugada es legal
+      if(!explore)explore={sans:[]};   // primera jugada explorada: crea el estado
+      explore.chess=c; explore.sans.push(mv.san);   // guarda posición nueva y la jugada en SAN
+      selSq=null;   // quita la selección
+      renderFen(c.fen(),game.userIsBlack);   // dibuja la posición resultante
+      $('exploreBar').hidden=false;          // muestra la barra amarilla de exploración
+      $('exploreMoves').textContent=explore.sans.join(' ');   // lista las jugadas exploradas
+      analyze(c.fen());        // analiza la posición nueva
+      maybeAutoImport();       // replica al tablero 2 si el switch automático está activo
+      return;   // listo, jugada hecha
     }
   }
+  // Si no se movió: ¿se clicó una pieza del color al que le toca?
   const piece=c.get(sqName);
   if(piece&&piece.color===c.turn()){
-    selSq=sqName;
-    paintSelection(c.moves({square:sqName,verbose:true}).map(m=>m.to),sqName);
+    selSq=sqName;   // selecciónala
+    paintSelection(c.moves({square:sqName,verbose:true}).map(m=>m.to),sqName);   // y muestra sus destinos legales
   }else{
-    selSq=null; renderFen(fen,game.userIsBlack);
+    selSq=null; renderFen(fen,game.userIsBlack);   // clic en vacío/rival: deselecciona y limpia
   }
 });
+// Botón "volver a la partida": abandona la exploración y regresa al replay
 $('exploreBack').onclick=()=>{explore=null;selSq=null;$('exploreBar').hidden=true;setPly(ply);};
 
-// ---- tablero de análisis: importa la posición actual y sugiere continuaciones ----
+// ============================================================================
+// TABLERO DE ANÁLISIS (tablero 2): importa la posición y sugiere continuaciones
+// ============================================================================
+// Referencia al <div> del tablero de análisis
 const board2El=document.getElementById('board2');
+// a2 = estado del tablero 2 · selSq2 = casilla seleccionada en él
 let a2=null, selSq2=null;   // a2 = {chess, startFen, flip, sans:[]}
 
+// Orientación elegida por el usuario con 🔄; null = seguir la del tablero principal
+let a2FlipPref=null;   // orientación elegida con 🔄; null = seguir al tablero principal
+// Importa una posición al tablero 2: crea estado nuevo, dibuja y analiza
 function importFen(fen,flip){
-  a2={chess:new Chess(fen), startFen:fen, flip:flip, sans:[]};
-  selSq2=null;
-  $('analysis').hidden=false;
-  renderBoard2();
-  analyze2();
+  a2={chess:new Chess(fen), startFen:fen, flip:a2FlipPref!=null?a2FlipPref:flip, sans:[]};   // estado nuevo; respeta la orientación guardada si existe
+  selSq2=null; drawArrows2([]);   // limpia selección y flechas anteriores
+  $('analysis').hidden=false;     // muestra la sección (estaba oculta al inicio)
+  renderBoard2();                 // dibuja el tablero 2
+  analyze2();                     // y pide sugerencias al motor
 }
+// Botón "importar": copia la posición actual del tablero principal
 $('btnImport').onclick=()=>{
-  if(typeof Chess==='undefined'){alert('chess.js no cargó (se necesita internet).');return;}
-  const fen=liveMode?lastLiveFen:baseFen();
-  if(!fen){alert('No hay posición que importar todavía.');return;}
-  importFen(fen,flipShown);
-  $('analysis').scrollIntoView({behavior:'smooth'});
+  if(typeof Chess==='undefined'){alert('chess.js no cargó (se necesita internet).');return;}   // sin chess.js no funciona el tablero 2
+  const fen=liveMode?lastLiveFen:baseFen();   // en vivo usa la posición del bookmarklet; si no, la del replay/exploración
+  if(!fen){alert('No hay posición que importar todavía.');return;}   // nada que importar aún
+  importFen(fen,flipShown);   // importa con la orientación que se está mostrando
+  $('analysis').scrollIntoView({behavior:'smooth'});   // baja suavemente hasta la sección de análisis
 };
+// Importación automática: se llama cada vez que cambia la posición principal
 function maybeAutoImport(){
-  if(!$('autoImport').checked||typeof Chess==='undefined')return;
-  const fen=liveMode?lastLiveFen:baseFen();
-  if(!fen)return;
+  if(!$('autoImport').checked||typeof Chess==='undefined')return;   // switch apagado o sin chess.js: no hace nada
+  const fen=liveMode?lastLiveFen:baseFen();   // posición a importar según el modo
+  if(!fen)return;   // todavía no hay posición
   if(a2&&a2.startFen===fen)return;   // misma posición: no pisar lo que el usuario mueva en el tablero 2
-  importFen(fen,flipShown);
+  importFen(fen,flipShown);   // posición nueva: impórtala
 }
+// Al encender el switch, importa de inmediato la posición actual
 $('autoImport').onchange=()=>maybeAutoImport();
 
+// Dibuja el tablero 2 y actualiza su historial de jugadas
 function renderBoard2(hl){
-  if(!a2)return;
-  drawBoard(board2El,a2.chess.fen(),a2.flip,hl);
-  const h=a2.chess.history(), parts=[];
-  const black1st=a2.startFen.split(' ')[1]==='b';
+  if(!a2)return;   // no hay nada importado todavía
+  drawBoard(board2El,a2.chess.fen(),a2.flip,hl);   // dibuja la posición actual (hl = jugada a resaltar)
+  const h=a2.chess.history(), parts=[];   // jugadas hechas desde la importación, y piezas del texto
+  const black1st=a2.startFen.split(' ')[1]==='b';   // ¿la posición importada le tocaba a negras?
+  // Numera las jugadas correctamente aunque empiece moviendo negras
   for(let i=0;i<h.length;i++){
-    const n=Math.floor((i+(black1st?1:0))/2)+1;
-    if(i===0&&black1st)parts.push(`${n}… <b>${h[i]}</b>`);
-    else if((i+(black1st?1:0))%2===0)parts.push(`${n}. <b>${h[i]}</b>`);
-    else parts.push(`<b>${h[i]}</b>`);
+    const n=Math.floor((i+(black1st?1:0))/2)+1;   // número de jugada completa
+    if(i===0&&black1st)parts.push(`${n}… <b>${h[i]}</b>`);                   // primera jugada de negras: "5… Nf6"
+    else if((i+(black1st?1:0))%2===0)parts.push(`${n}. <b>${h[i]}</b>`);     // jugada de blancas: "6. e4"
+    else parts.push(`<b>${h[i]}</b>`);                                        // jugada de negras sin número
   }
-  $('a2Hist').innerHTML=parts.length?parts.join(' '):'— (posición importada, sin jugadas aún)';
+  $('a2Hist').innerHTML=parts.length?parts.join(' '):'— (posición importada, sin jugadas aún)';   // pinta el historial (o el aviso de vacío)
 }
 
+// Convierte una variante en UCI (["e2e4","e7e5",...]) a SAN numerado ("1. e4 e5 2. ...")
 function pvToSan(fen,pvUci,maxMoves){
-  const c=new Chess(fen), out=[];
-  const black1st=fen.split(' ')[1]==='b';
+  const c=new Chess(fen), out=[];   // tablero temporal para reproducir la variante
+  const black1st=fen.split(' ')[1]==='b';   // ¿empieza moviendo negras?
+  // Reproduce hasta maxMoves medias jugadas de la variante
   for(let i=0;i<Math.min(pvUci.length,maxMoves);i++){
-    const u=pvUci[i];
-    const mv=c.move({from:u.slice(0,2),to:u.slice(2,4),promotion:u[4]||'q'});
-    if(!mv)break;
-    const n=Math.floor((i+(black1st?1:0))/2)+1;
-    if(i===0&&black1st)out.push(`${n}… ${mv.san}`);
-    else if((i+(black1st?1:0))%2===0)out.push(`${n}. ${mv.san}`);
-    else out.push(mv.san);
+    const u=pvUci[i];   // jugada en formato UCI, ej. "g1f3"
+    const mv=c.move({from:u.slice(0,2),to:u.slice(2,4),promotion:u[4]||'q'});   // la ejecuta para obtener su SAN
+    if(!mv)break;   // jugada ilegal (no debería pasar): corta
+    const n=Math.floor((i+(black1st?1:0))/2)+1;   // número de jugada completa
+    if(i===0&&black1st)out.push(`${n}… ${mv.san}`);                    // arranque con negras: "5… Nf6"
+    else if((i+(black1st?1:0))%2===0)out.push(`${n}. ${mv.san}`);      // jugada de blancas con número
+    else out.push(mv.san);                                              // jugada de negras sin número
   }
-  return out.join(' ');
+  return out.join(' ');   // la variante como texto legible
 }
 
-function setEvalBar(whitePct,txt){
-  $('evalBar').classList.toggle('flip',!!(a2&&a2.flip));
-  $('evalFill').style.height=Math.max(0,Math.min(100,whitePct))+'%';
-  $('evalBarTxt').textContent=txt;
+// ============================================================================
+// FLECHAS DE SUGERENCIAS sobre el tablero 2 (viewBox 0..8, 1 unidad = casilla)
+// ============================================================================
+// Colores por ranking: verde = mejor línea, amarillo = segunda, azul = tercera
+const ARROW_COLORS=['#81b64c','#f7c631','#4a7fb5'];
+// Últimas flechas dibujadas, para poder redibujarlas al girar el tablero
+let lastArrows=[];   // [{uci,color,op}] para redibujar al girar
+// Convierte el nombre de una casilla ("e4") al centro de esa casilla en coordenadas SVG
+function sqXY(name){
+  const f='abcdefgh'.indexOf(name[0]), r=+name[1];   // columna 0-7 y fila 1-8
+  const flip=!!(a2&&a2.flip);   // respeta la orientación actual del tablero 2
+  return [(flip?7-f:f)+0.5,(flip?r-1:8-r)+0.5];   // +0.5 = centro de la casilla
 }
+// Genera el SVG de UNA flecha: línea gruesa + punta triangular
+function arrowShape(uci,color,op){
+  const [x1,y1]=sqXY(uci.slice(0,2)), [x2,y2]=sqXY(uci.slice(2,4));   // centros de origen y destino
+  const dx=x2-x1, dy=y2-y1, L=Math.hypot(dx,dy); if(!L)return '';   // vector y longitud (si es 0, nada que dibujar)
+  const ux=dx/L, uy=dy/L, px=-uy, py=ux;   // vector unitario y su perpendicular
+  const sx=x1+ux*0.35, sy=y1+uy*0.35;        // nace fuera del centro de origen
+  const hx=x2-ux*0.38, hy=y2-uy*0.38;        // base de la punta
+  return `<line x1="${sx}" y1="${sy}" x2="${hx}" y2="${hy}" stroke="${color}" stroke-width="0.22" stroke-linecap="round" opacity="${op}"/>`   // el cuerpo de la flecha
+    +`<polygon points="${x2},${y2} ${hx+px*0.26},${hy+py*0.26} ${hx-px*0.26},${hy-py*0.26}" fill="${color}" opacity="${op}"/>`;   // la punta triangular
+}
+// Dibuja (o borra, con []) el conjunto de flechas en la capa SVG
+function drawArrows2(arrows){
+  lastArrows=arrows||[];   // recuerda las flechas para redibujos posteriores
+  $('arrows2').innerHTML=lastArrows.map(a=>arrowShape(a.uci,a.color,a.op)).join('');   // genera todo el SVG de una vez
+}
+// ============================================================================
+// BARRA DE EVALUACIÓN del tablero 2
+// ============================================================================
+// Pinta la barra: whitePct = % de la barra que ocupa el blanco; txt = numerito al pie
+function setEvalBar(whitePct,txt){
+  $('evalBar').classList.toggle('flip',!!(a2&&a2.flip));   // orienta la barra igual que el tablero
+  $('evalFill').style.height=Math.max(0,Math.min(100,whitePct))+'%';   // acota 0-100 y aplica la altura
+  $('evalBarTxt').textContent=txt;   // numerito (peones de ventaja, "M3", "#", "½")
+}
+// Traduce una evaluación del motor a la barra
 function evalBarFromInfo(info,fen){
-  if(!info){setEvalBar(50,'');return;}
+  if(!info){setEvalBar(50,'');return;}   // sin datos: barra neutral
+  // Mate forzado: barra llena hacia el lado que da mate
   if(info.mate!=null){
-    const m=fen.split(' ')[1]==='b'?-info.mate:info.mate;
-    setEvalBar(m>0?100:0,'M'+Math.abs(m));
+    const m=fen.split(' ')[1]==='b'?-info.mate:info.mate;   // signo desde el punto de vista de blancas
+    setEvalBar(m>0?100:0,'M'+Math.abs(m));   // 100% blanco o 0%, con "M<n>" al pie
     return;
   }
-  const v=toWhiteEval(info,fen);
+  const v=toWhiteEval(info,fen);   // centipeones desde blancas
   // curva suave: ±1 peón ≈ 60/40, ±4 peones ≈ 83/17, se satura hacia 100/0
   setEvalBar(50+50*(2/(1+Math.exp(-0.004*v))-1),Math.abs(v/100).toFixed(1));
 }
+// Formatea una evaluación como texto: "+0.45", "-1.20", "+M3"…
 function fmtEval(info,fen){
-  if(!info)return '…';
-  if(info.mate!=null){const m=fen.split(' ')[1]==='b'?-info.mate:info.mate;return(m>0?'+M':'-M')+Math.abs(m);}
-  const v=toWhiteEval(info,fen);
-  return(v>0?'+':'')+(v/100).toFixed(2);
+  if(!info)return '…';   // aún sin datos
+  if(info.mate!=null){const m=fen.split(' ')[1]==='b'?-info.mate:info.mate;return(m>0?'+M':'-M')+Math.abs(m);}   // mate forzado
+  const v=toWhiteEval(info,fen);   // centipeones desde blancas
+  return(v>0?'+':'')+(v/100).toFixed(2);   // peones con signo y dos decimales
 }
 
+// Analiza la posición del tablero 2 y pinta sugerencias, flechas y barra
 function analyze2(){
-  if(!a2)return;
-  const fen=a2.chess.fen();
+  if(!a2)return;   // nada importado todavía
+  const fen=a2.chess.fen();   // posición actual del tablero 2
+  // ¿La partida terminó en esta posición? No hay nada que sugerir
   if(a2.chess.game_over()){
-    if(a2.chess.in_checkmate()){
-      $('eval2').textContent='Jaque mate';
-      setEvalBar(a2.chess.turn()==='w'?0:100,'#');
-    }else{
-      $('eval2').textContent='Tablas';
-      setEvalBar(50,'½');
+    if(a2.chess.in_checkmate()){   // jaque mate
+      $('eval2').textContent='Jaque mate';   // anuncia el mate
+      setEvalBar(a2.chess.turn()==='w'?0:100,'#');   // barra llena hacia el ganador (pierde el que está en jaque)
+    }else{   // ahogado, repetición, material insuficiente…
+      $('eval2').textContent='Tablas';   // anuncia tablas
+      setEvalBar(50,'½');   // barra al 50% con "½"
     }
-    $('sug2').textContent='La partida terminó en esta posición.';
-    return;
+    $('sug2').textContent='La partida terminó en esta posición.';   // mensaje en el panel
+    drawArrows2([]);   // sin flechas
+    return;   // no hay análisis que hacer
   }
-  if(liveMode){
-    $('eval2').textContent='—';
-    setEvalBar(50,'');
-    $('sug2').textContent='Sugerencias desactivadas mientras hay partida en vivo (fair play). Al terminar tu partida se activan solas.';
-    return;
+  // Fair play: si el servidor dice que no se puede usar el motor (partida en vivo), bloquea
+  if(!canUseStockfish){
+    $('eval2').textContent='—';   // sin evaluación
+    setEvalBar(50,'');            // barra neutral
+    $('sug2').textContent='Sugerencias desactivadas mientras hay partida en vivo (fair play). Al terminar tu partida se activan solas.';   // explica por qué
+    drawArrows2([]);              // sin flechas
+    return;   // y no encola nada al motor
   }
-  if(!engineReady){$('sug2').textContent='cargando motor…';setTimeout(()=>{if(a2&&a2.chess.fen()===fen)analyze2();},800);return;}
-  jobQueue=jobQueue.filter(j=>j.kind!=='ui2');
-  $('eval2').textContent='…'; $('sug2').textContent='analizando…';
+  if(!engineReady){$('sug2').textContent='cargando motor…';setTimeout(()=>{if(a2&&a2.chess.fen()===fen)analyze2();},800);return;}   // motor aún cargando: reintenta en 800 ms si la posición no cambió
+  jobQueue=jobQueue.filter(j=>j.kind!=='ui2');   // descarta análisis viejos del tablero 2
+  $('eval2').textContent='…'; $('sug2').textContent='analizando…';   // feedback inmediato
+  // Encola el análisis con MultiPV=3 (tres mejores líneas), prioridad alta
   enqueue({kind:'ui2',fen,depth:14,multipv:3,cb:(info,mv,infos)=>{
-    if(!a2||a2.chess.fen()!==fen||!infos.length)return;
-    $('eval2').textContent=fmtEval(infos[0],fen)+(fen.split(' ')[1]==='w'?' — juegan blancas':' — juegan negras');
-    evalBarFromInfo(infos[0],fen);
-    const box=$('sug2'); box.innerHTML='';
-    infos.forEach(inf=>{
-      if(!inf||!inf.pv.length)return;
-      const div=document.createElement('div');
-      div.className='line';
-      div.innerHTML=`<span class="ev">${fmtEval(inf,fen)}</span><span class="pv">${pvToSan(fen,inf.pv,8)}</span>`;
-      div.onclick=()=>playUci2(inf.pv[0]);
-      box.appendChild(div);
+    if(!a2||a2.chess.fen()!==fen||!infos.length)return;   // la posición ya cambió o no hay resultados: descarta
+    $('eval2').textContent=fmtEval(infos[0],fen)+(fen.split(' ')[1]==='w'?' — juegan blancas':' — juegan negras');   // evaluación + a quién le toca
+    evalBarFromInfo(infos[0],fen);   // actualiza la barra con la mejor línea
+    const box=$('sug2'); box.innerHTML='';   // limpia el panel de sugerencias
+    const arrows=[];   // flechas a dibujar
+    // Crea una fila clicable por cada línea sugerida
+    infos.forEach((inf,i)=>{
+      if(!inf||!inf.pv.length)return;   // línea vacía (menos jugadas legales que MultiPV): sáltala
+      const color=ARROW_COLORS[i%ARROW_COLORS.length];   // color según el ranking de la línea
+      const div=document.createElement('div');   // la fila de la sugerencia
+      div.className='line';   // estilo de línea clicable
+      div.innerHTML=`<span class="ev" style="color:${color}">${fmtEval(inf,fen)}</span><span class="pv">${pvToSan(fen,inf.pv,8)}</span>`;   // evaluación coloreada + continuación en SAN (hasta 8 medias jugadas)
+      div.onclick=()=>playUci2(inf.pv[0]);   // clic en la línea → juega su primera jugada
+      box.appendChild(div);   // agrega la fila al panel
+      arrows.push({uci:inf.pv[0],color,op:i===0?0.9:0.55});   // y su flecha (la mejor más opaca)
     });
-    const best=infos[0]&&infos[0].pv[0];
-    if(best)renderBoard2([best.slice(0,2),best.slice(2,4)]);
+    const best=infos[0]&&infos[0].pv[0];   // primera jugada de la mejor línea
+    if(best)renderBoard2([best.slice(0,2),best.slice(2,4)]);   // resalta origen/destino de la mejor en el tablero
+    drawArrows2(arrows.reverse());   // la mejor se dibuja al final, encima de las demás
   }},true);
-  if(currentJob)engine.postMessage('stop');
+  if(currentJob)engine.postMessage('stop');   // aborta el análisis en curso para atender este antes
 }
 
+// Juega una jugada en formato UCI sobre el tablero 2 (la usan las sugerencias)
 function playUci2(u){
-  if(!a2||!u)return;
-  const mv=a2.chess.move({from:u.slice(0,2),to:u.slice(2,4),promotion:u[4]||'q'});
-  if(mv){selSq2=null;renderBoard2();analyze2();}
+  if(!a2||!u)return;   // sin tablero o sin jugada: nada
+  const mv=a2.chess.move({from:u.slice(0,2),to:u.slice(2,4),promotion:u[4]||'q'});   // intenta la jugada
+  if(mv){selSq2=null;renderBoard2();analyze2();}   // si fue legal: limpia selección, redibuja y re-analiza
 }
 
+// Manejador de clics sobre el tablero 2: mover piezas libremente
 board2El.addEventListener('click',e=>{
-  if(!a2)return;
-  const sqEl=e.target.closest('.sq'); if(!sqEl)return;
-  const sqName=sqEl.dataset.sq;
+  if(!a2)return;   // nada importado: ignora
+  const sqEl=e.target.closest('.sq'); if(!sqEl)return;   // encuentra la casilla clicada
+  const sqName=sqEl.dataset.sq;   // su nombre algebraico
+  // ¿Había una pieza seleccionada? → intenta mover a la casilla clicada
   if(selSq2&&selSq2!==sqName){
-    const mv=a2.chess.move({from:selSq2,to:sqName,promotion:'q'});
-    if(mv){selSq2=null;renderBoard2();analyze2();return;}
+    const mv=a2.chess.move({from:selSq2,to:sqName,promotion:'q'});   // intenta la jugada (corona dama)
+    if(mv){selSq2=null;renderBoard2();analyze2();return;}   // legal: redibuja y re-analiza
   }
+  // Si no: ¿se clicó una pieza del color al que le toca?
   const piece=a2.chess.get(sqName);
   if(piece&&piece.color===a2.chess.turn()){
-    selSq2=sqName;
-    renderBoard2();
-    const q=n=>board2El.querySelector(`[data-sq="${n}"]`);
-    const s=q(sqName); if(s)s.classList.add('sel');
-    a2.chess.moves({square:sqName,verbose:true}).forEach(m=>{const el=q(m.to);if(el)el.classList.add('dot');});
+    selSq2=sqName;   // selecciónala
+    renderBoard2();  // redibuja limpio
+    const q=n=>board2El.querySelector(`[data-sq="${n}"]`);   // helper para buscar casillas
+    const s=q(sqName); if(s)s.classList.add('sel');          // marco azul en la seleccionada
+    a2.chess.moves({square:sqName,verbose:true}).forEach(m=>{const el=q(m.to);if(el)el.classList.add('dot');});   // punto en cada destino legal
   }else{
-    selSq2=null; renderBoard2();
+    selSq2=null; renderBoard2();   // clic inválido: deselecciona y limpia
   }
 });
 
+// ⏮ Importada: vuelve a la posición tal como se importó
 $('a2Reset').onclick=()=>{if(a2){a2.chess=new Chess(a2.startFen);selSq2=null;renderBoard2();analyze2();}};
+// ↩ Deshacer: quita la última jugada hecha en el tablero 2
 $('a2Undo').onclick=()=>{if(a2){a2.chess.undo();selSq2=null;renderBoard2();analyze2();}};
-$('a2Flip').onclick=()=>{if(a2){a2.flip=!a2.flip;renderBoard2();$('evalBar').classList.toggle('flip',a2.flip);}};
+// 🔄 Girar: invierte la orientación, la RECUERDA, y redibuja tablero, barra y flechas
+$('a2Flip').onclick=()=>{if(a2){a2.flip=!a2.flip;a2FlipPref=a2.flip;renderBoard2();$('evalBar').classList.toggle('flip',a2.flip);drawArrows2(lastArrows);}};
+// ★ Jugar la mejor: simula un clic en la primera línea de sugerencias
 $('a2Best').onclick=()=>{
-  const first=$('sug2').querySelector('.line');
-  if(first)first.click();
+  const first=$('sug2').querySelector('.line');   // la primera fila del panel
+  if(first)first.click();   // si existe, juégala
 };
 
-// ---- loop principal ----
+// ============================================================================
+// LOOP PRINCIPAL: consulta el servidor local cada segundo y actualiza todo
+// ============================================================================
+// lastGameId = última partida cargada · lastLiveFen = última posición en vivo recibida
 let lastGameId=null, lastLiveFen=null;
 async function tick(){
   try{
-    const st=await (await fetch('/api/state')).json();
-    $('status').textContent='Servidor: '+st.status;
-    if(st.live){
-      liveMode=true; stopPlay(); $('replayControls').hidden=true;
-      $('mode').textContent='EN VIVO'; $('mode').className='badge live';
+    const st=await (await fetch('/api/state')).json();   // pide el estado completo al servidor
+    $('status').textContent='Servidor: '+st.status;      // pinta el estado de conexión
+    isLive=st.isLive!=null?!!st.isLive:!!st.live;        // ¿hay partida en vivo? (con fallback para servidores viejos)
+    canUseStockfish=st.canUseStockfish!=null?!!st.canUseStockfish:!isLive;   // el servidor decide si se puede usar el motor
+    // ---- MODO EN VIVO: el bookmarklet está transmitiendo tu partida ----
+    if(isLive&&st.live){
+      liveMode=true; stopPlay(); $('replayControls').hidden=true;   // entra a modo vivo: pausa y oculta el replay
+      $('mode').textContent='EN VIVO'; $('mode').className='badge live';   // pildorita roja
       // 2 = juegas con negras → tablero volteado; si no llegó el dato, usa el color de tu última partida
       const pa=Number(st.live.playingAs);
-      const flip=pa===2||(pa!==1&&!!(game&&game.userIsBlack));
-      lastLiveFen=st.live.fen;
-      renderFen(st.live.fen,flip);
-      $('btnImport').hidden=false; $('autoImportLbl').hidden=false;
-      maybeAutoImport();
-      const c=st.live.clocks||[];
-      $('topClock').textContent=c[0]||'--:--';
-      $('botClock').textContent=c[1]||'--:--';
-      $('topName').textContent='Oponente'; $('topRating').textContent='';
-      $('botName').textContent='TheZackES'; $('botRating').textContent='';
-      $('result').textContent='Partida en curso…';
-      $('evalline').textContent='—';
-      $('bestmove').textContent='Análisis desactivado durante la partida (fair play). Al terminar, el replay con sugerencias carga solo.';
+      const flip=pa===2||(pa!==1&&!!(game&&game.userIsBlack));   // decide la orientación
+      lastLiveFen=st.live.fen;             // guarda la posición (para el botón de importar)
+      renderFen(st.live.fen,flip);         // dibuja la posición en vivo
+      $('btnImport').hidden=false; $('autoImportLbl').hidden=false;   // permite importar también en vivo
+      maybeAutoImport();                   // importa automáticamente si el switch está activo
+      const c=st.live.clocks||[];          // relojes capturados por el bookmarklet
+      $('topClock').textContent=c[0]||'--:--';   // reloj de arriba
+      $('botClock').textContent=c[1]||'--:--';   // reloj de abajo
+      $('topName').textContent='Oponente'; $('topRating').textContent='';   // en vivo no sabemos el nombre del rival
+      $('botName').textContent='TheZackES'; $('botRating').textContent='';  // abajo siempre tú
+      $('result').textContent='Partida en curso…';   // aún no hay resultado
+      $('evalline').textContent='—';   // sin evaluación en vivo
+      $('bestmove').textContent='Análisis desactivado durante la partida (fair play). Al terminar, el replay con sugerencias carga solo.';   // recuerda el porqué
     }else{
+    // ---- MODO REPLAY: no hay partida en vivo ----
       if(liveMode){liveMode=false;lastGameId=null;if(a2)analyze2();}   // al acabar el live, recarga la última y reactiva sugerencias
-      $('mode').textContent='ÚLTIMA PARTIDA'; $('mode').className='badge';
-      if(st.latest&&st.latest.id!==lastGameId){lastGameId=st.latest.id;loadGame(st.latest);}
+      $('mode').textContent='ÚLTIMA PARTIDA'; $('mode').className='badge';   // pildorita gris
+      if(st.latest&&st.latest.id!==lastGameId){lastGameId=st.latest.id;loadGame(st.latest);}   // si hay partida nueva, cárgala
     }
-  }catch(e){ $('status').textContent='Sin conexión con el servidor local'; }
+  }catch(e){ $('status').textContent='Sin conexión con el servidor local'; }   // el servidor no responde: avisa
 }
-setInterval(tick,1000); tick();
+setInterval(tick,1000); tick();   // repite cada segundo, y una vez inmediatamente al cargar
 
-// ---- bookmarklet ----
+// ============================================================================
+// BOOKMARKLET: el código que corre DENTRO de la pestaña de chess.com
+// y manda tu posición al servidor local cada segundo.
+// (Es un template literal: no insertar comentarios dentro, forma parte del marcador)
+// ============================================================================
 const bmSrc=`(function(){
   if(window.__zackwatch){alert('ZackWatch ya esta activo en esta pestana');return;}
   var b=document.querySelector('wc-chess-board');
@@ -665,7 +827,16 @@ const bmSrc=`(function(){
   window.__zackwatch=setInterval(send,1000);send();
   console.log('[ZackWatch] transmitiendo a localhost:8787');
 })();`;
+// Qué hace el bookmarklet, línea por línea:
+//   1. Si ya está activo en la pestaña (window.__zackwatch), avisa y sale.
+//   2. Busca el elemento <wc-chess-board> de chess.com; sin él, avisa y sale.
+//   3. pa(): averigua tu color (1=blancas, 2=negras) probando tres métodos distintos.
+//   4. clocks(): lee el texto de los dos relojes visibles en la página.
+//   5. send(): manda por POST al servidor local el FEN actual, relojes y tu color.
+//   6. Repite send() cada segundo con setInterval y lo anuncia en la consola.
+// Convierte el código anterior en un enlace "javascript:" y lo pone en el botón verde
 $('bm').href='javascript:'+encodeURIComponent(bmSrc);
+// Si alguien hace CLIC en el botón (en vez de arrastrarlo), le explica cómo se usa
 $('bm').onclick=e=>{e.preventDefault();alert('No hagas clic aquí: arrástralo a la barra de marcadores y úsalo en la pestaña de chess.com.');};
 </script>
 </body>
