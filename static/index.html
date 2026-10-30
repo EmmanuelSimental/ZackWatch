@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZackWatch</title>
+<style>
+  :root{
+    --bg:#312e2b; --panel:#272522; --panel2:#211f1c; --text:#e8e6e3; --dim:#989795;
+    --light:#ebecd0; --dark:#739552; --accent:#81b64c; --live:#e02828;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,"Segoe UI",sans-serif;padding:16px}
+  .wrap{max-width:960px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 2px}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:14px}
+  .layout{display:flex;gap:18px;flex-wrap:wrap}
+  .boardcol{flex:0 0 auto}
+  .side{flex:1 1 260px;min-width:260px;display:flex;flex-direction:column;gap:10px}
+  .player{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--panel);border-radius:8px;margin:6px 0;width:min(480px,92vw)}
+  .player .name{font-weight:600}
+  .player .rating{color:var(--dim);margin-left:6px;font-weight:400}
+  .clock{font-variant-numeric:tabular-nums;font-weight:700;font-size:17px;background:var(--panel2);padding:2px 10px;border-radius:6px}
+  .clock.active{background:#fff;color:#111}
+  #board{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:min(480px,92vw);aspect-ratio:1;border-radius:6px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,.4)}
+  .sq{position:relative;display:flex;align-items:center;justify-content:center;font-size:clamp(26px,5.2vw,40px);line-height:1;user-select:none;overflow:hidden}
+  .sq.l{background:var(--light)} .sq.d{background:var(--dark)}
+  .sq .wp{color:#fff;-webkit-text-stroke:1.2px #2f2f2f;text-shadow:0 2px 3px rgba(0,0,0,.5)}
+  .sq .bp{color:#121007;-webkit-text-stroke:1.2px #cfcfcf;text-shadow:0 0 4px rgba(255,255,255,.35)}
+  .sq.hlf{box-shadow:inset 0 0 0 4px rgba(255,210,60,.9)}
+  .sq.hlt{box-shadow:inset 0 0 0 4px rgba(140,225,95,.95)}
+  .sq{cursor:pointer}
+  .sq.sel{box-shadow:inset 0 0 0 4px rgba(90,170,255,.95)}
+  .sq.dot::before{content:"";position:absolute;width:30%;height:30%;border-radius:50%;background:rgba(20,18,15,.35);z-index:1}
+  #exploreBar{display:flex;gap:10px;align-items:center;margin-top:8px;width:min(480px,92vw);background:#3a3320;border:1px solid #f7c631;border-radius:8px;padding:8px 12px;font-size:13px}
+  #exploreBar button{background:#f7c631;color:#14120f;border:0;border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer}
+  #exploreMoves{flex:1;color:#f7c631;font-weight:600}
+  .sq.danger::after,.sq.warn::after,.sq.safe::after{content:"";position:absolute;top:0;right:0;border-style:solid;border-width:0 15px 15px 0}
+  .sq.danger::after{border-color:transparent #e02828 transparent transparent}
+  .sq.warn::after{border-color:transparent #f7c631 transparent transparent}
+  .sq.safe::after{border-color:transparent #81b64c transparent transparent}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.06em;padding:3px 10px;border-radius:99px;background:var(--panel2);color:var(--dim)}
+  .badge.live{background:var(--live);color:#fff}
+  .badge.live::before{content:"";width:8px;height:8px;border-radius:50%;background:#fff;animation:blink 1s infinite}
+  @keyframes blink{50%{opacity:.25}}
+  .card{background:var(--panel);border-radius:10px;padding:12px 14px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin:0 0 8px}
+  #moves{max-height:300px;overflow-y:auto;font-variant-numeric:tabular-nums;font-size:14px}
+  #moves .row{display:flex;gap:10px;padding:1px 6px;border-radius:4px}
+  #moves .row:nth-child(odd){background:rgba(255,255,255,.03)}
+  #moves .num{color:var(--dim);width:28px;flex:none}
+  #moves .mv{width:64px;cursor:pointer}
+  #moves .mv.cur{background:var(--accent);color:#14120f;border-radius:4px;padding:0 4px;font-weight:700}
+  .controls{display:flex;gap:8px;align-items:center;margin-top:10px;width:min(480px,92vw)}
+  .controls button{background:var(--panel);color:var(--text);border:0;border-radius:8px;padding:8px 14px;font-size:16px;cursor:pointer}
+  .controls button:hover{background:#3a3733}
+  .controls input[type=range]{flex:1;accent-color:var(--accent)}
+  #result{font-weight:700;color:var(--accent)}
+  .bm{display:inline-block;background:var(--accent);color:#14120f;font-weight:700;padding:8px 14px;border-radius:8px;text-decoration:none;cursor:grab}
+  ol{margin:8px 0 0;padding-left:20px;color:var(--dim)} ol b{color:var(--text)}
+  #status{font-size:12px;color:var(--dim);margin-top:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>♞ ZackWatch <span id="mode" class="badge">conectando…</span></h1>
+  <div class="sub">Partidas de <b>TheZackES</b> en chess.com — detección automática</div>
+
+  <div class="layout">
+    <div class="boardcol">
+      <div class="player"><span><span class="name" id="topName">—</span><span class="rating" id="topRating"></span></span><span class="clock" id="topClock">--:--</span></div>
+      <div id="board"></div>
+      <div class="player"><span><span class="name" id="botName">—</span><span class="rating" id="botRating"></span></span><span class="clock" id="botClock">--:--</span></div>
+      <div class="controls" id="replayControls" hidden>
+        <button id="btnStart" title="Inicio">⏮</button>
+        <button id="btnPrev" title="Anterior">◀</button>
+        <button id="btnPlay" title="Reproducir">▶</button>
+        <button id="btnNext" title="Siguiente">▶︎▶︎</button>
+        <input type="range" id="slider" min="0" max="0" value="0">
+      </div>
+      <label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;color:var(--dim);width:min(480px,92vw)">
+        <input type="checkbox" id="safetyToggle" checked>
+        Piezas: <span style="color:#e02828">◤ expuesta</span> <span style="color:#f7c631">◤ en disputa</span> <span style="color:#81b64c">◤ protegida</span>
+      </label>
+      <div id="exploreBar" hidden>
+        <span>🧪 Explorando:</span><span id="exploreMoves"></span>
+        <button id="exploreBack">↩ Volver a la partida</button>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="card"><h2>Resultado</h2><div id="result">—</div><div id="tc" style="color:var(--dim);font-size:13px"></div></div>
+      <div class="card">
+        <h2>Análisis Stockfish <label style="float:right;font-weight:400;text-transform:none;letter-spacing:0"><input type="checkbox" id="suggestToggle" checked> activar</label></h2>
+        <div id="evalline" style="font-weight:700;font-size:18px">—</div>
+        <div id="bestmove" style="color:var(--dim)">cargando motor…</div>
+        <div style="color:var(--dim);font-size:12px;margin-top:6px">Solo en replay de partidas terminadas. En vivo se desactiva: usar motor durante la partida es trampa y chess.com banea por eso.</div>
+      </div>
+      <div class="card"><h2>Jugadas</h2><div id="blunders" style="font-size:12px;color:var(--dim);margin-bottom:6px"></div><div id="moves">—</div></div>
+      <div class="card">
+        <h2>Modo EN VIVO</h2>
+        <p style="margin:0 0 10px;font-size:13px;color:var(--dim)">Arrastra este botón a tu barra de marcadores. Cuando estés jugando en chess.com, haz clic en él y esta página mostrará tu tablero al segundo.</p>
+        <a class="bm" id="bm" href="#">🔴 ZackWatch Live</a>
+        <ol style="font-size:13px">
+          <li>Arrastra <b>🔴 ZackWatch Live</b> a la barra de marcadores (⌘⇧B si está oculta).</li>
+          <li>Empieza tu partida en chess.com.</li>
+          <li>Haz clic en el marcador <b>una vez por partida</b>.</li>
+        </ol>
+      </div>
+      <div id="status"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script>
+const PIECES={K:"♔",Q:"♕",R:"♖",B:"♗",N:"♘",P:"♙",k:"♚",q:"♛",r:"♜",b:"♝",n:"♞",p:"♟"};
+const boardEl=document.getElementById('board');
+const $=id=>document.getElementById(id);
+let liveMode=false;
+
+// Ataques/defensas de cada pieza (sin rayos X: cuenta el primer bloqueo)
+const DIRS_R=[[1,0],[-1,0],[0,1],[0,-1]], DIRS_B=[[1,1],[1,-1],[-1,1],[-1,-1]];
+const KNIGHT=[[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]];
+function computeSafety(grid){
+  const inB=(r,c)=>r>=0&&r<8&&c>=0&&c<8;
+  function attackers(r,c,white){
+    let n=0;
+    const pr=white?r+1:r-1;                      // peones (fila 0 = octava)
+    for(const dc of[-1,1]) if(inB(pr,c+dc)&&grid[pr][c+dc]===(white?'P':'p'))n++;
+    for(const[dr,dc]of KNIGHT) if(inB(r+dr,c+dc)&&grid[r+dr][c+dc]===(white?'N':'n'))n++;
+    for(const[dr,dc]of[...DIRS_R,...DIRS_B]) if(inB(r+dr,c+dc)&&grid[r+dr][c+dc]===(white?'K':'k'))n++;
+    for(const[dr,dc]of DIRS_R){
+      let rr=r+dr,cc=c+dc;
+      while(inB(rr,cc)){const p=grid[rr][cc];if(p){if(white?(p==='R'||p==='Q'):(p==='r'||p==='q'))n++;break;}rr+=dr;cc+=dc;}
+    }
+    for(const[dr,dc]of DIRS_B){
+      let rr=r+dr,cc=c+dc;
+      while(inB(rr,cc)){const p=grid[rr][cc];if(p){if(white?(p==='B'||p==='Q'):(p==='b'||p==='q'))n++;break;}rr+=dr;cc+=dc;}
+    }
+    return n;
+  }
+  const marks={};
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+    const p=grid[r][c];
+    if(!p||p.toLowerCase()==='k')continue;       // el rey no se marca
+    const isW=p===p.toUpperCase();
+    const atk=attackers(r,c,!isW), def=attackers(r,c,isW);
+    let cls=null;
+    if(atk>0&&def===0)cls='danger';
+    else if(atk>0)cls='warn';
+    else if(def>0)cls='safe';
+    if(cls)marks['abcdefgh'[c]+(8-r)]=cls;
+  }
+  return marks;
+}
+
+let fenShown='', flipShown=false;
+function renderFen(fen,flip,hl){
+  fenShown=fen; flipShown=flip;
+  const rows=fen.split(' ')[0].split('/');
+  const grid=[];
+  for(const row of rows){
+    const r=[];
+    for(const ch of row){
+      if(/\d/.test(ch)) for(let i=0;i<+ch;i++) r.push('');
+      else r.push(ch);
+    }
+    grid.push(r);
+  }
+  boardEl.innerHTML='';
+  const marks=$('safetyToggle').checked?computeSafety(grid):{};
+  const ranks=[...Array(8).keys()];       // 0..7 = fila 8..1 del FEN
+  const files=[...Array(8).keys()];
+  const R=flip?[...ranks].reverse():ranks, F=flip?[...files].reverse():files;
+  for(const ri of R) for(const fi of F){
+    const sq=document.createElement('div');
+    const name='abcdefgh'[fi]+(8-ri);
+    let cls='sq '+(((ri+fi)%2===0)?'l':'d');
+    if(hl&&hl[0]===name)cls+=' hlf';
+    if(hl&&hl[1]===name)cls+=' hlt';
+    if(marks[name])cls+=' '+marks[name];
+    sq.className=cls;
+    sq.dataset.sq=name;
+    const p=grid[ri][fi];
+    if(p){const s=document.createElement('span');s.className=(p===p.toUpperCase())?'wp':'bp';s.textContent=PIECES[p];sq.appendChild(s);}
+    boardEl.appendChild(sq);
+  }
+}
+renderFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",false);
+
+function fmtTenths(t){const s=Math.max(0,Math.floor(t/10));return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;}
+
+// ---- motor Stockfish (solo replay) ----
+let engine=null, engineReady=false, lastInfo=null;
+let jobQueue=[], currentJob=null;
+function pump(){
+  if(!engineReady||currentJob||jobQueue.length===0)return;
+  currentJob=jobQueue.shift(); lastInfo=null;
+  engine.postMessage('position fen '+currentJob.fen);
+  engine.postMessage('go depth '+currentJob.depth);
+}
+function enqueue(job,front){ if(front)jobQueue.unshift(job); else jobQueue.push(job); pump(); }
+async function initEngine(){
+  try{
+    const r=await fetch('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    engine=new Worker(URL.createObjectURL(await r.blob()));
+    engine.onmessage=e=>onEngine(String(e.data));
+    engine.postMessage('uci');
+  }catch(e){ $('bestmove').textContent='Motor no disponible (se necesita internet): '+e.message; }
+}
+function toWhiteEval(info,fen){
+  if(!info)return null;
+  let v=info.mate!=null?(info.mate>0?1500:-1500):Math.max(-1500,Math.min(1500,info.cp||0));
+  return fen.split(' ')[1]==='b'?-v:v;
+}
+function onEngine(line){
+  if(line==='uciok'){engineReady=true;$('bestmove').textContent='motor listo';pump();return;}
+  if(line.startsWith('info')&&line.includes(' pv ')){
+    const cp=line.match(/score cp (-?\d+)/), mate=line.match(/score mate (-?\d+)/);
+    lastInfo={cp:cp?+cp[1]:null, mate:mate?+mate[1]:null};
+  }
+  if(line.startsWith('bestmove')){
+    const job=currentJob; currentJob=null;
+    if(job)job.cb(lastInfo,line.split(' ')[1]);
+    pump();
+  }
+}
+function analyze(fen){
+  if(!engineReady||!$('suggestToggle').checked||liveMode)return;
+  jobQueue=jobQueue.filter(j=>j.kind!=='ui');
+  $('evalline').textContent='…'; $('bestmove').textContent='analizando…';
+  enqueue({kind:'ui',fen,depth:13,cb:(info,mv)=>{
+    if(fen!==fenShown||!info||!mv||mv==='(none)')return;
+    const v=toWhiteEval(info,fen);
+    let evalTxt;
+    if(info.mate!=null){const m=fen.split(' ')[1]==='b'?-info.mate:info.mate;evalTxt=(m>0?'+M':'-M')+Math.abs(m);}
+    else evalTxt=(v>0?'+':'')+(v/100).toFixed(2);
+    $('evalline').textContent=evalTxt;
+    $('bestmove').textContent=`Mejor jugada: ${mv.slice(0,2)} → ${mv.slice(2,4)}`+(mv.length>4?` (corona ${mv[4].toUpperCase()})`:'');
+    renderFen(fenShown,flipShown,[mv.slice(0,2),mv.slice(2,4)]);
+  }},true);
+  if(currentJob)engine.postMessage('stop');   // acelera: aborta el análisis en curso
+}
+function analyzeGameErrors(g){
+  if(g.evals)return;
+  if(!engineReady){setTimeout(()=>analyzeGameErrors(g),800);return;}
+  g.evals=new Array(g.fens.length).fill(null);
+  let done=0; const total=g.fens.length;
+  $('blunders').textContent=`Buscando errores… 0/${total}`;
+  g.fens.forEach((fen,i)=>{
+    enqueue({kind:'batch',fen,depth:12,cb:(info)=>{
+      if(game!==g)return;
+      g.evals[i]=toWhiteEval(info,fen);
+      done++;
+      if(done<total)$('blunders').textContent=`Buscando errores… ${done}/${total}`;
+      else markErrors(g);
+    }});
+  });
+}
+function classify(loss){
+  if(loss>=200)return['??','#fa412d'];
+  if(loss>=100)return['?','#ffa459'];
+  if(loss>=50)return['?!','#f7c631'];
+  return null;
+}
+function markErrors(g){
+  const mvs=document.querySelectorAll('#moves .mv');
+  const mine={'??':0,'?':0,'?!':0};
+  for(let i=0;i<g.sans.length;i++){
+    const before=g.evals[i], after=g.evals[i+1];
+    if(before==null||after==null)continue;
+    const whiteMove=i%2===0;
+    const c=classify(whiteMove?before-after:after-before);
+    if(c&&mvs[i]){
+      mvs[i].insertAdjacentHTML('beforeend',` <b style="color:${c[1]}">${c[0]}</b>`);
+      if(whiteMove!==g.userIsBlack)mine[c[0]]++;
+    }
+  }
+  $('blunders').innerHTML=`Tus errores: <b style="color:#fa412d">${mine['??']} ??</b> · <b style="color:#ffa459">${mine['?']} ?</b> · <b style="color:#f7c631">${mine['?!']} ?!</b> — clic en una jugada para verla`;
+}
+document.addEventListener('change',e=>{
+  if(e.target.id==='suggestToggle'){
+    if(e.target.checked&&game&&!liveMode){analyze(game.fens[ply]);analyzeGameErrors(game);}
+    else{$('evalline').textContent='—';$('bestmove').textContent='desactivado';if(game&&!liveMode)renderFen(game.fens[ply],game.userIsBlack);}
+  }
+  if(e.target.id==='safetyToggle'&&game&&!liveMode)renderFen(game.fens[ply],game.userIsBlack);
+});
+initEngine();
+
+// ---- replay ----
+let game=null, ply=0, playing=null;
+function setPly(p){
+  if(!game)return;
+  explore=null; selSq=null; $('exploreBar').hidden=true;
+  ply=Math.max(0,Math.min(p,game.fens.length-1));
+  renderFen(game.fens[ply],game.userIsBlack);
+  analyze(game.fens[ply]);
+  $('slider').value=ply;
+  // relojes en este ply
+  let w=null,b=null;
+  for(let i=0;i<Math.min(ply,game.clocks.length);i++){ if(i%2===0)w=game.clocks[i]; else b=game.clocks[i]; }
+  const wTxt=w!=null?fmtTenths(w):'--:--', bTxt=b!=null?fmtTenths(b):'--:--';
+  const names=playersOriented();
+  $('topClock').textContent=game.userIsBlack?wTxt:bTxt;
+  $('botClock').textContent=game.userIsBlack?bTxt:wTxt;
+  document.querySelectorAll('#moves .mv').forEach((el,i)=>el.classList.toggle('cur',i===ply-1));
+  const cur=document.querySelector('#moves .mv.cur'); if(cur)cur.scrollIntoView({block:'nearest'});
+}
+function playersOriented(){
+  const u=game.userIsBlack;
+  const top=u?game.white:game.black, bot=u?game.black:game.white;
+  $('topName').textContent=top.name; $('topRating').textContent=top.rating?`(${top.rating})`:'';
+  $('botName').textContent=bot.name; $('botRating').textContent=bot.rating?`(${bot.rating})`:'';
+}
+function loadGame(g){
+  game=g; playersOriented();
+  $('result').textContent=g.result||'—';
+  $('tc').textContent=g.timeControl?`Control de tiempo: ${g.timeControl}`:'';
+  $('slider').max=g.fens.length-1;
+  const mv=$('moves'); mv.innerHTML='';
+  for(let i=0;i<g.sans.length;i+=2){
+    const row=document.createElement('div');row.className='row';
+    row.innerHTML=`<span class="num">${i/2+1}.</span><span class="mv" data-p="${i+1}">${g.sans[i]}</span><span class="mv" data-p="${i+2}">${g.sans[i+1]||''}</span>`;
+    mv.appendChild(row);
+  }
+  mv.onclick=e=>{const el=e.target.closest('.mv');if(el&&el.dataset.p){stopPlay();setPly(+el.dataset.p);}};
+  $('replayControls').hidden=false;
+  $('blunders').textContent='';
+  jobQueue=jobQueue.filter(j=>j.kind!=='batch');
+  setPly(g.fens.length-1);
+  if($('suggestToggle').checked)analyzeGameErrors(g);
+}
+function stopPlay(){if(playing){clearInterval(playing);playing=null;$('btnPlay').textContent='▶';}}
+$('btnStart').onclick=()=>{stopPlay();setPly(0);};
+$('btnPrev').onclick=()=>{stopPlay();setPly(ply-1);};
+$('btnNext').onclick=()=>{stopPlay();setPly(ply+1);};
+$('btnPlay').onclick=()=>{
+  if(playing){stopPlay();return;}
+  if(ply>=game.fens.length-1)setPly(0);
+  $('btnPlay').textContent='⏸';
+  playing=setInterval(()=>{ if(ply>=game.fens.length-1)stopPlay(); else setPly(ply+1); },600);
+};
+$('slider').oninput=e=>{stopPlay();setPly(+e.target.value);};
+
+// ---- exploración: mueve piezas desde cualquier posición del replay ----
+let explore=null, selSq=null;
+function baseFen(){ return explore?explore.chess.fen():(game?game.fens[ply]:null); }
+function paintSelection(targets,sel){
+  renderFen(baseFen(),game.userIsBlack);
+  const q=n=>boardEl.querySelector(`[data-sq="${n}"]`);
+  const s=q(sel); if(s)s.classList.add('sel');
+  targets.forEach(t=>{const el=q(t);if(el)el.classList.add('dot');});
+}
+boardEl.addEventListener('click',e=>{
+  if(!game||liveMode)return;
+  if(typeof Chess==='undefined'){$('bestmove').textContent='chess.js no cargó (se necesita internet para explorar)';return;}
+  const sqEl=e.target.closest('.sq'); if(!sqEl)return;
+  stopPlay();
+  const sqName=sqEl.dataset.sq;
+  const fen=baseFen(); if(!fen)return;
+  const c=new Chess(fen);
+  if(selSq&&selSq!==sqName){
+    const mv=c.move({from:selSq,to:sqName,promotion:'q'});
+    if(mv){
+      if(!explore)explore={sans:[]};
+      explore.chess=c; explore.sans.push(mv.san);
+      selSq=null;
+      renderFen(c.fen(),game.userIsBlack);
+      $('exploreBar').hidden=false;
+      $('exploreMoves').textContent=explore.sans.join(' ');
+      analyze(c.fen());
+      return;
+    }
+  }
+  const piece=c.get(sqName);
+  if(piece&&piece.color===c.turn()){
+    selSq=sqName;
+    paintSelection(c.moves({square:sqName,verbose:true}).map(m=>m.to),sqName);
+  }else{
+    selSq=null; renderFen(fen,game.userIsBlack);
+  }
+});
+$('exploreBack').onclick=()=>{explore=null;selSq=null;$('exploreBar').hidden=true;setPly(ply);};
+
+// ---- loop principal ----
+let lastGameId=null;
+async function tick(){
+  try{
+    const st=await (await fetch('/api/state')).json();
+    $('status').textContent='Servidor: '+st.status;
+    if(st.live){
+      liveMode=true; stopPlay(); $('replayControls').hidden=true;
+      $('mode').textContent='EN VIVO'; $('mode').className='badge live';
+      const flip=st.live.playingAs===2;
+      renderFen(st.live.fen,flip);
+      const c=st.live.clocks||[];
+      $('topClock').textContent=c[0]||'--:--';
+      $('botClock').textContent=c[1]||'--:--';
+      $('topName').textContent='Oponente'; $('topRating').textContent='';
+      $('botName').textContent='TheZackES'; $('botRating').textContent='';
+      $('result').textContent='Partida en curso…';
+      $('evalline').textContent='—';
+      $('bestmove').textContent='Análisis desactivado durante la partida (fair play). Al terminar, el replay con sugerencias carga solo.';
+    }else{
+      if(liveMode){liveMode=false;lastGameId=null;}   // al acabar el live, recarga la última
+      $('mode').textContent='ÚLTIMA PARTIDA'; $('mode').className='badge';
+      if(st.latest&&st.latest.id!==lastGameId){lastGameId=st.latest.id;loadGame(st.latest);}
+    }
+  }catch(e){ $('status').textContent='Sin conexión con el servidor local'; }
+}
+setInterval(tick,1000); tick();
+
+// ---- bookmarklet ----
+const bmSrc=`(function(){
+  if(window.__zackwatch){alert('ZackWatch ya esta activo en esta pestana');return;}
+  var b=document.querySelector('wc-chess-board');
+  if(!b||!b.game){alert('No encontre el tablero de chess.com aqui. Abre esta pagina con tu partida.');return;}
+  var pa=null;try{pa=b.game.getPlayingAs();}catch(e){}
+  function clocks(){var els=document.querySelectorAll('.clock-component');
+    return Array.prototype.slice.call(els,0,2).map(function(e){return e.textContent.replace(/[^0-9:.]/g,'');});}
+  function send(){try{
+    fetch('http://localhost:8787/api/push',{method:'POST',mode:'no-cors',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({fen:b.game.getFEN(),clocks:clocks(),playingAs:pa})});
+  }catch(e){}}
+  window.__zackwatch=setInterval(send,1000);send();
+  console.log('[ZackWatch] transmitiendo a localhost:8787');
+})();`;
+$('bm').href='javascript:'+encodeURIComponent(bmSrc);
+$('bm').onclick=e=>{e.preventDefault();alert('No hagas clic aquí: arrástralo a la barra de marcadores y úsalo en la pestaña de chess.com.');};
+</script>
+</body>
+</html>
